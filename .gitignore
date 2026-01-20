@@ -1,0 +1,20 @@
+# Flutter / Android
+build/
+android/build/
+ios/build/
+
+# APKs
+*.apk
+*.aab
+
+# Native libs
+*.so
+
+# Gradle
+.gradle/
+local.properties
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
