@@ -1,20 +1,101 @@
-# Flutter / Android
-build/
-android/build/
-ios/build/
+# ------------------------------
+# OS / Editor noise
+# ------------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# APKs
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
+*~
+
+# ------------------------------
+# Logs / temp
+# ------------------------------
+*.log
+*.tmp
+*.temp
+
+# ------------------------------
+# Flutter / Dart generated
+# ------------------------------
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+.metadata
+
+# Flutter build output
+build/
+
+# ------------------------------
+# Android
+# ------------------------------
+android/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/local.properties
+android/key.properties
+*.jks
+*.keystore
+
+# APK / AAB artifacts
 *.apk
+*.ap_
 *.aab
 
 # Native libs
 *.so
 
-# Gradle
-.gradle/
-local.properties
+# ------------------------------
+# iOS / macOS
+# ------------------------------
+ios/Flutter/.last_build_id
+ios/Pods/
+ios/.symlinks/
+ios/Runner.xcworkspace/
+ios/Runner/GeneratedPluginRegistrant.*
+ios/Flutter/Flutter.framework
+ios/Flutter/App.framework
+ios/Flutter/ephemeral/
 
-# Flutter
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
+macos/Flutter/ephemeral/
+macos/Pods/
+macos/.symlinks/
+*.xcuserstate
+*.xcscmblueprint
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# ------------------------------
+# Linux / Windows generated build dirs
+# ------------------------------
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+
+# ------------------------------
+# Coverage / test output
+# ------------------------------
+coverage/
+test_driver/reports/
+
+# ------------------------------
+# Optional local env/config files
+# ------------------------------
+.env
+.env.*
+*.local
+
+# ------------------------------
+# Keep these tracked for Flutter apps
+# ------------------------------
+!pubspec.lock
