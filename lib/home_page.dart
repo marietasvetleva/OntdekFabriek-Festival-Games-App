@@ -3,7 +3,7 @@ import 'stage_page.dart';
 import 'FoodGame.dart';
 import 'FestivalCleanerApp.dart';
 import 'HangOutGame.dart';
-import 'ToiletGame.dart';
+import 'features/toilet/toilet_page.dart';
 import 'QR.dart'; 
 import 'game_over_page.dart';
 
