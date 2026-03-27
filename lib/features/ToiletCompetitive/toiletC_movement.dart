@@ -1,38 +1,6 @@
 import 'dart:ui';
 
-/// Returns the next vertical position from a simple falling motion.
-double nextFallY({
-  required double y,
-  required double speed,
-  required double dt,
-}) {
-  return y + (speed * dt);
-}
-
-/// Returns a shrunk size over time, clamped to avoid negative values.
-double nextSize({
-  required double size,
-  required double shrinkPerSecond,
-  required double dt,
-  required double minSize,
-}) {
-  final next = size - (shrinkPerSecond * dt);
-  return next < minSize ? minSize : next;
-}
-
-/// Despawns tiny or floor-reached items.
-bool shouldDespawn({
-  required double y,
-  required double size,
-  required double floorY,
-  required double minVisibleSize,
-}) {
-  final reachedFloor = y + size >= floorY;
-  final tooSmall = size <= minVisibleSize;
-  return reachedFloor || tooSmall;
-}
-
-/// Keeps a dragged item in the playfield bounds.
+/// Keeps a dragged item inside a [Rect] (e.g. full screen or playfield).
 Offset clampDragPosition({
   required Offset desiredTopLeft,
   required double itemSize,
@@ -63,7 +31,7 @@ bool isItemCaughtByBucket({
   return expandedBucket.overlaps(itemRect);
 }
 
-/// Resolves which bucket catches an item, if any.
+/// Resolves which bucket catches an item, if any (1 = left / P1, 2 = right / P2).
 int? resolveBucketOwner({
   required Rect itemRect,
   required Rect playerOneBucket,

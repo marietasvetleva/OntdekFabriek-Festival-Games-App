@@ -98,7 +98,7 @@ class ToiletCompetitiveLogic {
     state.activeItems.remove(item);
     final player = state.players[playerId]!;
 
-    if (_isGood(item.type)) {
+    if (isGoodItem(item.type)) {
       player.score += config.pointsCorrect;
       player.correct += 1;
       return DepositOutcome.correct;
@@ -138,6 +138,30 @@ class ToiletCompetitiveLogic {
     if (p1.lives > p2.lives) return CompetitivePlayerId.p1;
     if (p2.lives > p1.lives) return CompetitivePlayerId.p2;
     return null;
+  }
+
+  /// Whether this item type counts as a correct compost-toilet deposit.
+  bool isGoodItem(CompetitiveItemType type) => _isGood(type);
+
+  /// How far through its TTL the item is: 0 at spawn, 1 when expired.
+  double itemAgeProgress(
+    ToiletCompetitiveState state,
+    CompetitiveItemSpawn item,
+  ) {
+    final age = state.elapsedSec - item.spawnedAtSec;
+    if (item.ttlSec <= 0) return 1;
+    return (age / item.ttlSec).clamp(0.0, 1.0);
+  }
+
+  /// Maps TTL progress to a pixel size (large when new, small near expiry).
+  double itemDisplaySizePixels({
+    required ToiletCompetitiveState state,
+    required CompetitiveItemSpawn item,
+    required double maxSize,
+    required double minSize,
+  }) {
+    final t = itemAgeProgress(state, item);
+    return maxSize + (minSize - maxSize) * t;
   }
 
   // ===========================================================================

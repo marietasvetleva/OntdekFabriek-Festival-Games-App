@@ -1,37 +1,22 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:ui';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
+import 'toiletC_logic.dart';
+import 'toiletC_models.dart';
 import 'toiletC_movement.dart';
-
-enum _TrashKind { good, bad }
 
 enum _GamePhase { intro, running, finished }
 
-class _TrashItem {
-  _TrashItem({
-    required this.id,
-    required this.kind,
-    required this.assetPath,
-    required this.x,
-    required this.y,
-    required this.size,
-    required this.fallSpeed,
-  });
+/// Screen-space layout for one spawned item (logic only stores id/type/ttl).
+class _ItemLayout {
+  _ItemLayout({required this.x, required this.y});
 
-  final int id;
-  final _TrashKind kind;
-  final String assetPath;
   double x;
   double y;
-  double size;
-  double fallSpeed;
   int? draggedByPlayer;
-
-  Rect get rect => Rect.fromLTWH(x, y, size, size);
 }
 
 /// Two-player competitive trash game.
@@ -43,17 +28,12 @@ class ToiletCompetitivePage extends StatefulWidget {
 }
 
 class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
-  static const int _startHearts = 3;
-  static const int _roundSeconds = 60;
   static const double _itemMinSize = 18;
   static const double _itemStartSize = 76;
-  static const double _shrinkPerSecond = 10;
-  static const double _goodPoints = 1;
   static const double _bucketWidth = 130;
   static const double _bucketHeight = 92;
   static const double _bucketBottomMargin = 24;
 
-  // Swap these with your own assets.
   static const String _bgAsset = 'assets/ToiletCompetitive/bg.png';
   static const String _bucketAssetLeft = 'assets/ToiletCompetitive/bucket_left.png';
   static const String _bucketAssetRight =
@@ -61,7 +41,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   static const String _goodTrashAsset = 'assets/ToiletCompetitive/good_trash.png';
   static const String _badTrashAsset = 'assets/ToiletCompetitive/cigarette.png';
 
-  // Free Mixkit URLs for quick testing.
   static const String _sfxGoodCatch =
       'https://assets.mixkit.co/active_storage/sfx/270/270-preview.mp3';
   static const String _sfxBadCatch =
@@ -70,118 +49,73 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3';
 
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final Random _random = Random();
+  final Random _layoutRandom = Random();
 
-  final List<_TrashItem> _items = <_TrashItem>[];
-  final Map<int, int> _pointerOwnerById = <int, int>{};
-  int _idCounter = 0;
+  final ToiletCompetitiveLogic _logic = ToiletCompetitiveLogic();
+  late ToiletCompetitiveState _gameState;
+
+  final Map<String, _ItemLayout> _layouts = {};
+  final Map<int, int> _pointerOwnerById = {};
+
+  Timer? _frameTimer;
 
   _GamePhase _phase = _GamePhase.intro;
-  int _timeLeft = _roundSeconds;
-  int _playerOneHearts = _startHearts;
-  int _playerTwoHearts = _startHearts;
-  int _playerOneScore = 0;
-  int _playerTwoScore = 0;
 
-  Timer? _spawnTimer;
-  Timer? _frameTimer;
-  Timer? _countdownTimer;
+  @override
+  void initState() {
+    super.initState();
+    _gameState = _logic.createInitialState();
+  }
 
   @override
   void dispose() {
-    _spawnTimer?.cancel();
     _frameTimer?.cancel();
-    _countdownTimer?.cancel();
     _audioPlayer.dispose();
     super.dispose();
   }
 
   void _startGame() {
-    _spawnTimer?.cancel();
     _frameTimer?.cancel();
-    _countdownTimer?.cancel();
-
     setState(() {
       _phase = _GamePhase.running;
-      _timeLeft = _roundSeconds;
-      _playerOneHearts = _startHearts;
-      _playerTwoHearts = _startHearts;
-      _playerOneScore = 0;
-      _playerTwoScore = 0;
-      _items.clear();
-    });
-
-    _spawnTimer = Timer.periodic(const Duration(milliseconds: 850), (_) {
-      if (!mounted || _phase != _GamePhase.running) return;
-      setState(_spawnItem);
+      _layouts.clear();
+      _logic.start(_gameState);
     });
 
     _frameTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
       if (!mounted || _phase != _GamePhase.running) return;
-      setState(() => _tick(16 / 1000));
-    });
-
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || _phase != _GamePhase.running) return;
+      final size = MediaQuery.sizeOf(context);
+      final dt = 16 / 1000;
       setState(() {
-        _timeLeft -= 1;
-        if (_timeLeft <= 0) {
-          _timeLeft = 0;
-          _finishGame();
-        }
+        _logic.tick(_gameState, dt);
+        _syncLayoutsForActiveItems(_playArea(size));
       });
+      if (_gameState.finished) {
+        _finishGame();
+      }
     });
   }
 
-  void _tick(double dt) {
-    final toRemove = <int>{};
-    for (final item in _items) {
-      if (item.draggedByPlayer == null) {
-        item.size = nextSize(
-          size: item.size,
-          shrinkPerSecond: _shrinkPerSecond,
-          dt: dt,
-          minSize: _itemMinSize,
+  void _syncLayoutsForActiveItems(Rect playArea) {
+    final activeIds = _gameState.activeItems.map((e) => e.id).toSet();
+    _layouts.removeWhere((id, _) => !activeIds.contains(id));
+
+    for (final item in _gameState.activeItems) {
+      _layouts.putIfAbsent(item.id, () {
+        final margin = max(0.0, playArea.width - _itemStartSize);
+        final vmargin = max(0.0, playArea.height - _itemStartSize);
+        return _ItemLayout(
+          x: playArea.left + _layoutRandom.nextDouble() * margin,
+          y: playArea.top + _layoutRandom.nextDouble() * vmargin,
         );
-      }
-
-      if (item.size <= _itemMinSize) {
-        toRemove.add(item.id);
-      }
+      });
     }
-    _items.removeWhere((item) => toRemove.contains(item.id));
-
-    if (_playerOneHearts <= 0 || _playerTwoHearts <= 0) {
-      _finishGame();
-    }
-  }
-
-  void _spawnItem() {
-    final size = MediaQuery.of(context).size;
-    final playArea = _playArea(size);
-    final spawnX = playArea.left + _random.nextDouble() * (playArea.width - 90);
-    final spawnY = playArea.top + _random.nextDouble() * (playArea.height - 180);
-    final isBad = _random.nextInt(6) == 0; // ~16%
-
-    _items.add(
-      _TrashItem(
-        id: _idCounter++,
-        kind: isBad ? _TrashKind.bad : _TrashKind.good,
-        assetPath: isBad ? _badTrashAsset : _goodTrashAsset,
-        x: spawnX,
-        y: spawnY,
-        size: _itemStartSize,
-        fallSpeed: 0,
-      ),
-    );
   }
 
   void _finishGame() {
     if (_phase == _GamePhase.finished) return;
     _phase = _GamePhase.finished;
-    _spawnTimer?.cancel();
     _frameTimer?.cancel();
-    _countdownTimer?.cancel();
     _safePlaySfx(_sfxRoundEnd);
     _showResultDialog();
   }
@@ -189,6 +123,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   Future<void> _showResultDialog() async {
     if (!mounted) return;
     final winnerText = _winnerText();
+    final p1 = _gameState.players[CompetitivePlayerId.p1]!;
+    final p2 = _gameState.players[CompetitivePlayerId.p2]!;
 
     await showDialog<void>(
       context: context,
@@ -197,7 +133,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         return AlertDialog(
           title: const Text('Round klaar!'),
           content: Text(
-            '$winnerText\n\nSpeler 1: $_playerOneScore\nSpeler 2: $_playerTwoScore',
+            '$winnerText\n\nSpeler 1: ${p1.score}\nSpeler 2: ${p2.score}',
           ),
           actions: [
             TextButton(
@@ -216,10 +152,13 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   }
 
   String _winnerText() {
-    if (_playerOneHearts <= 0 && _playerTwoHearts > 0) return 'Speler 2 wint!';
-    if (_playerTwoHearts <= 0 && _playerOneHearts > 0) return 'Speler 1 wint!';
-    if (_playerOneScore > _playerTwoScore) return 'Speler 1 wint!';
-    if (_playerTwoScore > _playerOneScore) return 'Speler 2 wint!';
+    final p1 = _gameState.players[CompetitivePlayerId.p1]!;
+    final p2 = _gameState.players[CompetitivePlayerId.p2]!;
+    if (p1.lives <= 0 && p2.lives > 0) return 'Speler 2 wint!';
+    if (p2.lives <= 0 && p1.lives > 0) return 'Speler 1 wint!';
+    final w = _logic.winner(_gameState);
+    if (w == CompetitivePlayerId.p1) return 'Speler 1 wint!';
+    if (w == CompetitivePlayerId.p2) return 'Speler 2 wint!';
     return 'Gelijkspel!';
   }
 
@@ -236,12 +175,43 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     if (player == 1) {
       return Rect.fromLTWH(16, y, _bucketWidth, _bucketHeight);
     }
-    return Rect.fromLTWH(size.width - _bucketWidth - 16, y, _bucketWidth, _bucketHeight);
+    return Rect.fromLTWH(
+      size.width - _bucketWidth - 16,
+      y,
+      _bucketWidth,
+      _bucketHeight,
+    );
   }
 
-  _TrashItem? _hitTestItem(Offset globalPosition) {
-    for (final item in _items.reversed) {
-      if (item.rect.contains(globalPosition)) return item;
+  double _itemSizePixels(CompetitiveItemSpawn item) {
+    return _logic.itemDisplaySizePixels(
+      state: _gameState,
+      item: item,
+      maxSize: _itemStartSize,
+      minSize: _itemMinSize,
+    );
+  }
+
+  String _assetForType(CompetitiveItemType type) {
+    switch (type) {
+      case CompetitiveItemType.cigaretteBud:
+      case CompetitiveItemType.gum:
+        return _badTrashAsset;
+      case CompetitiveItemType.bananaPeel:
+      case CompetitiveItemType.leaf:
+      case CompetitiveItemType.compost:
+      case CompetitiveItemType.sawdust:
+        return _goodTrashAsset;
+    }
+  }
+
+  CompetitiveItemSpawn? _hitTestItem(Offset localPosition) {
+    for (final item in _gameState.activeItems.reversed) {
+      final layout = _layouts[item.id];
+      if (layout == null) continue;
+      final sz = _itemSizePixels(item);
+      final rect = Rect.fromLTWH(layout.x, layout.y, sz, sz);
+      if (rect.contains(localPosition)) return item;
     }
     return null;
   }
@@ -251,14 +221,18 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     return p.dx < size.width / 2 ? 1 : 2;
   }
 
+  CompetitivePlayerId _bucketOwnerToPlayerId(int bucketOwner) {
+    return bucketOwner == 1 ? CompetitivePlayerId.p1 : CompetitivePlayerId.p2;
+  }
+
   void _onPointerDown(PointerDownEvent event, Size size) {
     if (_phase != _GamePhase.running) return;
     final player = _playerFromPosition(event.localPosition, size);
     if (player == null) return;
     _pointerOwnerById[event.pointer] = player;
-    final item = _hitTestItem(event.localPosition);
-    if (item == null) return;
-    item.draggedByPlayer = player;
+    final spawn = _hitTestItem(event.localPosition);
+    if (spawn == null) return;
+    _layouts[spawn.id]?.draggedByPlayer = player;
   }
 
   void _onPointerMove(PointerMoveEvent event, Size size) {
@@ -266,22 +240,23 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final player = _pointerOwnerById[event.pointer];
     if (player == null) return;
 
-    final dragging = _items.where((item) => item.draggedByPlayer == player);
-    if (dragging.isEmpty) return;
+    final fullScreen = Rect.fromLTWH(0, 0, size.width, size.height);
+    for (final item in _gameState.activeItems) {
+      final layout = _layouts[item.id];
+      if (layout?.draggedByPlayer != player) continue;
 
-    final fullDragArea = Rect.fromLTWH(0, 0, size.width, size.height);
-    for (final item in dragging) {
+      final sz = _itemSizePixels(item);
       final desired = Offset(
-        event.localPosition.dx - (item.size / 2),
-        event.localPosition.dy - (item.size / 2),
+        event.localPosition.dx - sz / 2,
+        event.localPosition.dy - sz / 2,
       );
       final clamped = clampDragPosition(
         desiredTopLeft: desired,
-        itemSize: item.size,
-        playArea: fullDragArea,
+        itemSize: sz,
+        playArea: fullScreen,
       );
-      item.x = clamped.dx;
-      item.y = clamped.dy;
+      layout!.x = clamped.dx;
+      layout.y = clamped.dy;
     }
     setState(() {});
   }
@@ -294,61 +269,59 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final player = _pointerOwnerById.remove(pointerId);
     if (player == null) return;
 
-    final dropped = _items.where((item) => item.draggedByPlayer == player).toList();
-    if (dropped.isEmpty) return;
-
     final p1Bucket = _playerBucketRect(size, 1);
     final p2Bucket = _playerBucketRect(size, 2);
-    final toRemove = <int>{};
 
-    for (final item in dropped) {
-      item.draggedByPlayer = null;
-      final owner = resolveBucketOwner(
-        itemRect: item.rect,
+    for (final spawn in _gameState.activeItems.toList()) {
+      final layout = _layouts[spawn.id];
+      if (layout?.draggedByPlayer != player) continue;
+
+      layout!.draggedByPlayer = null;
+      final sz = _itemSizePixels(spawn);
+      final itemRect = Rect.fromLTWH(layout.x, layout.y, sz, sz);
+      final bucketOwner = resolveBucketOwner(
+        itemRect: itemRect,
         playerOneBucket: p1Bucket,
         playerTwoBucket: p2Bucket,
       );
+      if (bucketOwner == null) continue;
 
-      if (owner == null) continue;
-      _applyCatch(owner: owner, kind: item.kind);
-      toRemove.add(item.id);
+      final outcome = _logic.depositItem(
+        state: _gameState,
+        playerId: _bucketOwnerToPlayerId(bucketOwner),
+        itemId: spawn.id,
+      );
+      switch (outcome) {
+        case DepositOutcome.correct:
+          _safePlaySfx(_sfxGoodCatch);
+          break;
+        case DepositOutcome.wrong:
+          _safePlaySfx(_sfxBadCatch);
+          break;
+        case DepositOutcome.ignored:
+          break;
+      }
     }
 
     setState(() {
-      _items.removeWhere((item) => toRemove.contains(item.id));
+      _syncLayoutsForActiveItems(_playArea(size));
     });
-  }
 
-  void _applyCatch({required int owner, required _TrashKind kind}) {
-    if (kind == _TrashKind.good) {
-      if (owner == 1) {
-        _playerOneScore += _goodPoints.toInt();
-      } else {
-        _playerTwoScore += _goodPoints.toInt();
-      }
-      _safePlaySfx(_sfxGoodCatch);
-      return;
+    if (_gameState.finished) {
+      _finishGame();
     }
-
-    if (owner == 1) {
-      _playerOneHearts = max(0, _playerOneHearts - 1);
-    } else {
-      _playerTwoHearts = max(0, _playerTwoHearts - 1);
-    }
-    _safePlaySfx(_sfxBadCatch);
   }
 
   Future<void> _safePlaySfx(String assetPath) async {
     try {
-      final isUrl = assetPath.startsWith('http://') || assetPath.startsWith('https://');
+      final isUrl =
+          assetPath.startsWith('http://') || assetPath.startsWith('https://');
       if (isUrl) {
         await _audioPlayer.play(UrlSource(assetPath));
       } else {
         await _audioPlayer.play(AssetSource(assetPath));
       }
-    } catch (_) {
-      // Silent fallback while asset paths are still placeholders.
-    }
+    } catch (_) {}
   }
 
   Widget _imageOrFallback({
@@ -378,10 +351,11 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
   }
 
-  Widget _hearts(int hearts) {
+  Widget _hearts(int lives) {
+    final maxL = _logic.config.startLives;
     return Row(
-      children: List.generate(3, (i) {
-        final alive = i < hearts;
+      children: List.generate(maxL, (i) {
+        final alive = i < lives;
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: Icon(
@@ -394,12 +368,66 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
   }
 
+  List<Widget> _arenaItemWidgets(Rect playArea) {
+    final widgets = <Widget>[];
+    for (final item in _gameState.activeItems) {
+      if (_layouts[item.id]?.draggedByPlayer != null) continue;
+      final layout = _layouts[item.id];
+      if (layout == null) continue;
+      final sz = _itemSizePixels(item);
+      widgets.add(
+        Positioned(
+          left: layout.x - playArea.left,
+          top: layout.y - playArea.top,
+          child: _imageOrFallback(
+            path: _assetForType(item.type),
+            width: sz,
+            height: sz,
+            fallbackColor: _logic.isGoodItem(item.type)
+                ? const Color(0xFFDCD3A6)
+                : const Color(0xFFC88D7A),
+            shape: BoxShape.circle,
+          ),
+        ),
+      );
+    }
+    return widgets;
+  }
+
+  List<Widget> _draggedItemWidgets() {
+    final widgets = <Widget>[];
+    for (final item in _gameState.activeItems) {
+      if (_layouts[item.id]?.draggedByPlayer == null) continue;
+      final layout = _layouts[item.id]!;
+      final sz = _itemSizePixels(item);
+      widgets.add(
+        Positioned(
+          left: layout.x,
+          top: layout.y,
+          child: _imageOrFallback(
+            path: _assetForType(item.type),
+            width: sz,
+            height: sz,
+            fallbackColor: _logic.isGoodItem(item.type)
+                ? const Color(0xFFDCD3A6)
+                : const Color(0xFFC88D7A),
+            shape: BoxShape.circle,
+          ),
+        ),
+      );
+    }
+    return widgets;
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final playArea = _playArea(size);
     final p1Bucket = _playerBucketRect(size, 1);
     final p2Bucket = _playerBucketRect(size, 2);
+    final p1 = _gameState.players[CompetitivePlayerId.p1]!;
+    final p2 = _gameState.players[CompetitivePlayerId.p2]!;
+    final secsLeft = _logic.timeLeftSec(_gameState).ceil().clamp(0, 99999);
 
     if (_phase == _GamePhase.intro) {
       return Scaffold(
@@ -417,8 +445,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 const SizedBox(height: 12),
                 const Text(
                   'Links = Speler 1, Rechts = Speler 2.\n'
-                  'Sleep vallend afval naar je eigen emmer.\n'
-                  'Sigaret in je emmer = 1 hart kwijt.',
+                  'Sleep afval naar je eigen emmer.\n'
+                  'Sigaret of kauwgom in je emmer = hart kwijt.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16),
                 ),
@@ -429,7 +457,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                     backgroundColor: const Color(0xFFDCEBD8),
                     foregroundColor: const Color(0xFF1E2A1F),
                   ),
-                  child: const Text('Start ronde (60s)'),
+                  child: Text(
+                    'Start ronde (${_logic.config.gameDurationSec}s)',
+                  ),
                 ),
               ],
             ),
@@ -466,12 +496,12 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
               Positioned(
                 left: 20,
                 top: 12,
-                child: _hearts(_playerOneHearts),
+                child: _hearts(p1.lives),
               ),
               Positioned(
                 right: 20,
                 top: 12,
-                child: _hearts(_playerTwoHearts),
+                child: _hearts(p2.lives),
               ),
               Positioned(
                 top: 6,
@@ -487,7 +517,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      '00:${_timeLeft.toString().padLeft(2, '0')}',
+                      '${(secsLeft ~/ 60).toString().padLeft(2, '0')}:'
+                      '${(secsLeft % 60).toString().padLeft(2, '0')}',
                       style: const TextStyle(
                         fontSize: 40,
                         fontWeight: FontWeight.w700,
@@ -497,14 +528,13 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                   ),
                 ),
               ),
-              // Play arena: trash is rendered and clipped only inside this zone.
               Positioned.fromRect(
                 rect: playArea,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(28),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDCEBD8).withOpacity(0.5),
+                      color: const Color(0xFFDCEBD8).withValues(alpha: 0.5),
                       border: Border.all(
                         color: const Color(0xFFB8CBB7),
                         width: 2,
@@ -512,44 +542,12 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                       borderRadius: BorderRadius.circular(28),
                     ),
                     child: Stack(
-                      children: [
-                        for (final item in _items)
-                          if (item.draggedByPlayer == null)
-                          Positioned(
-                            left: item.x - playArea.left,
-                            top: item.y - playArea.top,
-                            child: _imageOrFallback(
-                              path: item.assetPath,
-                              width: item.size,
-                              height: item.size,
-                              fallbackColor: item.kind == _TrashKind.bad
-                                  ? const Color(0xFFC88D7A)
-                                  : const Color(0xFFDCD3A6),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                      ],
+                      children: _arenaItemWidgets(playArea),
                     ),
                   ),
                 ),
               ),
-              // Dragged items render above the arena so they remain visible
-              // when players move them toward the bins outside the playfield.
-              for (final item in _items)
-                if (item.draggedByPlayer != null)
-                  Positioned(
-                    left: item.x,
-                    top: item.y,
-                    child: _imageOrFallback(
-                      path: item.assetPath,
-                      width: item.size,
-                      height: item.size,
-                      fallbackColor: item.kind == _TrashKind.bad
-                          ? const Color(0xFFC88D7A)
-                          : const Color(0xFFDCD3A6),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
+              ..._draggedItemWidgets(),
               Positioned(
                 left: p1Bucket.left,
                 top: p1Bucket.top,
@@ -574,7 +572,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 left: 24,
                 bottom: 8,
                 child: Text(
-                  'P1: $_playerOneScore',
+                  'P1: ${p1.score}',
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
@@ -586,7 +584,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 right: 24,
                 bottom: 8,
                 child: Text(
-                  'P2: $_playerTwoScore',
+                  'P2: ${p2.score}',
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
