@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'stage_page.dart';
 import 'FoodGame.dart';
 import 'FestivalCleanerApp.dart';
-import 'HangOutGame.dart';
-import 'ToiletGame.dart';
-import 'QR.dart'; 
+import 'features/hangout/presentation/pages/hangout_quiz_page.dart';
+import 'features/toilet/toilet_page.dart';
+import 'QR.dart';
 import 'game_over_page.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -23,7 +23,6 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _foodCompleted = false;
   bool _wasteCompleted = false;
 
-  // ----------- NAVIGATION -----------
   Future<void> _navigateToStage() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
@@ -38,7 +37,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
     );
-    // Mark as completed when returning (either finished or back button)
+
     if (!_stageCompleted) {
       setState(() => _stageCompleted = true);
       _checkAllGamesCompleted();
@@ -46,10 +45,10 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _navigateToFoodTruck() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const FoodTruckPage()));
-    // Mark as completed when returning (either finished or back button)
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const FoodTruckPage()),
+    );
+
     if (!_foodCompleted) {
       setState(() => _foodCompleted = true);
       _checkAllGamesCompleted();
@@ -57,10 +56,10 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _navigateToHangout() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const HangoutQuizPage()));
-    // Mark as completed when returning (either finished or back button)
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const HangoutQuizPage()),
+    );
+
     if (!_hangoutCompleted) {
       setState(() => _hangoutCompleted = true);
       _checkAllGamesCompleted();
@@ -68,10 +67,10 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _navigateToCleaner() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const FestivalCleanerApp()));
-    // Mark as completed when returning (either finished or back button)
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const FestivalCleanerApp()),
+    );
+
     if (!_wasteCompleted) {
       setState(() => _wasteCompleted = true);
       _checkAllGamesCompleted();
@@ -79,14 +78,24 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _navigateToToiletGame() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const ToiletGamePage()));
-    // Mark as completed when returning (either finished or back button)
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ToiletGamePage()),
+    );
+
     if (!_toiletCompleted) {
       setState(() => _toiletCompleted = true);
       _checkAllGamesCompleted();
     }
+  }
+
+  Future<void> _navigateToQR() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => QRScannerPage(
+          festivalName: widget.festivalName,
+        ),
+      ),
+    );
   }
 
   void _checkAllGamesCompleted() {
@@ -95,17 +104,16 @@ class _MyHomePageState extends State<MyHomePage> {
         _hangoutCompleted &&
         _foodCompleted &&
         _wasteCompleted) {
-      // All 5 games completed, trigger score page
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => GameOverPage(
-                ecoScore: 8, // You can calculate actual score if needed
+                ecoScore: 8,
                 bandName: 'Your Band',
                 festivalName: widget.festivalName,
                 onMinigameCompleted: () {},
-                isGoodEnding: true, // Set based on score threshold if needed
+                isGoodEnding: true,
               ),
             ),
           );
@@ -114,17 +122,6 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void _navigateToQR() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => QRScannerPage(
-          festivalName: widget.festivalName, // 🔹 FIXED: Pass festival name
-        ),
-      ),
-    );
-  }
-
-  // ----------- GRAYSCALE -----------
   ColorFilter _gray(bool completed) {
     return completed
         ? const ColorFilter.mode(Colors.transparent, BlendMode.color)
@@ -158,109 +155,95 @@ class _MyHomePageState extends State<MyHomePage> {
 
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 139, 210, 142),
-      body: Stack(
-        children: [
-          // ------------------ STAGE ------------------
-          Positioned(
-            top: 16,
-            left: 16,
-            child: ColorFiltered(
-              colorFilter: _gray(_stageCompleted),
-              child: GestureDetector(
-                onTap: _navigateToStage,
-                child: _buildSquare(
-                  squareSize,
-                  label: "stage",
-                  image: "assets/Images/Festival_Colour.png",
-                ),
-              ),
-            ),
-          ),
-
-          // ------------------ TOILET ------------------
-          Positioned(
-            top: 16,
-            right: 16,
-            child: ColorFiltered(
-              colorFilter: _gray(_toiletCompleted),
-              child: GestureDetector(
-                onTap: _navigateToToiletGame,
-                child: _buildSquare(
-                  squareSize,
-                  label: "toilet",
-                  image: "assets/Images/toilet.jpeg",
-                ),
-              ),
-            ),
-          ),
-
-          // ------------------ WASTE ------------------
-          Positioned(
-            top: 16,
-            left: 0,
-            right: 0,
-            child: Center(
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned(
+              top: 16,
+              left: 16,
               child: ColorFiltered(
-                colorFilter: _gray(_wasteCompleted),
+                colorFilter: _gray(_stageCompleted),
                 child: GestureDetector(
-                  onTap: _navigateToCleaner,
+                  onTap: _navigateToStage,
                   child: _buildSquare(
                     squareSize,
-                    label: "waste",
-                    image: "assets/Images/waste.jpeg",
+                    label: "stage",
+                    image: "assets/Images/Festival_Colour.png",
                   ),
                 ),
               ),
             ),
-          ),
-
-          // ------------------ HANGOUT ------------------
-          Positioned(
-            bottom: 16,
-            left: 0,
-            right: 0,
-            child: Center(
+            Positioned(
+              top: 16,
+              right: 16,
               child: ColorFiltered(
-                colorFilter: _gray(_hangoutCompleted),
+                colorFilter: _gray(_toiletCompleted),
                 child: GestureDetector(
-                  onTap: _navigateToHangout,
+                  onTap: _navigateToToiletGame,
                   child: _buildSquare(
                     squareSize,
-                    label: "hang out",
-                    image: "assets/garden/Hangout_minigame.jpg",
+                    label: "toilet",
+                    image: "assets/Images/toilet.jpeg",
                   ),
                 ),
               ),
             ),
-          ),
-
-          // ------------------ FOOD TRUCK ------------------
-          Positioned(
-            bottom: 16,
-            right: 16,
-            child: ColorFiltered(
-              colorFilter: _gray(_foodCompleted),
-              child: GestureDetector(
-                onTap: _navigateToFoodTruck,
-                child: _buildSquare(
-                  squareSize,
-                  label: "food truck",
-                  image: "assets/Images/food.jpeg",
+            Positioned(
+              top: 16,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ColorFiltered(
+                  colorFilter: _gray(_wasteCompleted),
+                  child: GestureDetector(
+                    onTap: _navigateToCleaner,
+                    child: _buildSquare(
+                      squareSize,
+                      label: "waste",
+                      image: "assets/Images/waste.jpeg",
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-
-          // ------------------ QR BUTTON ------------------
-          Positioned(
-            bottom: 16,
-            left: 16,
-            child: ColorFiltered(
-              colorFilter: _gray(
-                _wasteCompleted,
-              ), // Use the same logic as other buttons
+            Positioned(
+              bottom: 16,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ColorFiltered(
+                  colorFilter: _gray(_hangoutCompleted),
+                  child: GestureDetector(
+                    onTap: _navigateToHangout,
+                    child: _buildSquare(
+                      squareSize,
+                      label: "hang out",
+                      image: "assets/garden/Hangout_minigame.jpg",
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: ColorFiltered(
+                colorFilter: _gray(_foodCompleted),
+                child: GestureDetector(
+                  onTap: _navigateToFoodTruck,
+                  child: _buildSquare(
+                    squareSize,
+                    label: "food truck",
+                    image: "assets/Images/food.jpeg",
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 16,
+              left: 16,
               child: GestureDetector(
-                onTap: _navigateToQR, // 🔹 FIXED: navigates to QRScannerPage
+                onTap: _navigateToQR,
                 child: _buildSquare(
                   squareSize,
                   label: "QR",
@@ -268,13 +251,12 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // ----------- SQUARE UI BUILDER -----------
   Widget _buildSquare(
     double size, {
     required String label,
@@ -286,7 +268,10 @@ class _MyHomePageState extends State<MyHomePage> {
       decoration: BoxDecoration(
         border: Border.all(color: Colors.black, width: 2),
         borderRadius: BorderRadius.circular(8),
-        image: DecorationImage(image: AssetImage(image), fit: BoxFit.cover),
+        image: DecorationImage(
+          image: AssetImage(image),
+          fit: BoxFit.cover,
+        ),
       ),
       child: _labelOverlay(label, size),
     );

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'HangOutGame.dart';
+import 'features/hangout/presentation/pages/hangout_quiz_page.dart';
 import 'stage_page.dart';
-import 'ToiletGame.dart';
+import 'features/toilet/toilet_page.dart';
 import 'FoodGame.dart';
 import 'FestivalCleanerApp.dart';
 import 'services/led_service.dart';
-import 'scores_page.dart'; // Import ScoresPage
+import 'scores_page.dart';
+import 'home_page.dart';
 
 class QRScannerPage extends StatefulWidget {
   final String festivalName;
@@ -24,7 +25,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
   @override
   void initState() {
     super.initState();
-    controller = MobileScannerController(facing: CameraFacing.front);
+    controller = MobileScannerController(
+      facing: CameraFacing.back,
+    );
   }
 
   @override
@@ -35,14 +38,22 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
   Future<void> _navigate(Widget page) async {
     _alreadyScanned = true;
-    await controller.stop();
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+
+    try {
+      await controller.stop();
+    } catch (_) {}
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => page),
+    );
+
     _alreadyScanned = false;
 
-    // Check if all games are completed after returning from a game
     _checkAndNavigateToScores(context);
 
-    await controller.start();
+    try {
+      await controller.start();
+    } catch (_) {}
   }
 
   Future<void> _handleQRCode(String qrValue) async {
@@ -50,13 +61,16 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
     final v = qrValue.trim().toLowerCase();
 
-    // Hangout
-    if (v.contains('hangout')) {
-      await _navigate(const HangoutQuizPage());
+    if (v.contains('home') || v.contains('homepage') || v.contains('start')) {
+      await _navigate(MyHomePage(festivalName: widget.festivalName));
       return;
     }
 
-    // Stage / Podium
+    if (v.contains('hangout')) {
+      await _navigate(HangoutQuizPage());
+      return;
+    }
+
     if (v.contains('stage') || v.contains('podium')) {
       await _navigate(
         StagePage(
@@ -67,40 +81,203 @@ class _QRScannerPageState extends State<QRScannerPage> {
       return;
     }
 
-    // Toilet
     if (v.contains('toilet') || v.contains('wc')) {
-      await _navigate(const ToiletGamePage());
+      await _navigate(ToiletGamePage());
       return;
     }
 
-    // Food
     if (v.contains('food') || v.contains('eten')) {
       await _navigate(const FoodTruckPage());
       return;
     }
 
-    // Waste / Cleaner
     if (v.contains('waste') || v.contains('cleaner') || v.contains('schoon')) {
       await _navigate(const FestivalCleanerApp());
       return;
     }
 
-    // Onbekende QR
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Onbekende QR: $qrValue')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Unknown QR: $qrValue')),
+    );
   }
 
   void _checkAndNavigateToScores(BuildContext context) {
-    // Logic to check if all games are completed
     final completed = LedService.getCompletedStatus();
     if (completed.values.every((v) => v)) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => const ScoresPage(), // No parameters needed
+          builder: (_) => const ScoresPage(),
         ),
       );
     }
+  }
+
+  Future<void> _openHome() async {
+    await _navigate(MyHomePage(festivalName: widget.festivalName));
+  }
+
+  Future<void> _openStage() async {
+    await _navigate(
+      StagePage(
+        festivalName: widget.festivalName,
+        onMinigameCompleted: () {},
+      ),
+    );
+  }
+
+  Future<void> _openHangout() async {
+    await _navigate(HangoutQuizPage());
+  }
+
+  Future<void> _openToilet() async {
+    await _navigate(ToiletGamePage());
+  }
+
+  Future<void> _openFood() async {
+    await _navigate(const FoodTruckPage());
+  }
+
+  Future<void> _openCleaner() async {
+    await _navigate(const FestivalCleanerApp());
+  }
+
+  Widget _buildGameButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      width: 120,
+      height: 52,
+      child: ElevatedButton.icon(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF2E7D32),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        icon: Icon(icon, size: 20),
+        label: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickAccessPanel() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'Choose a page or minigame',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _buildGameButton(
+                label: 'Home',
+                icon: Icons.home,
+                onTap: _openHome,
+              ),
+              _buildGameButton(
+                label: 'Stage',
+                icon: Icons.music_note,
+                onTap: _openStage,
+              ),
+              _buildGameButton(
+                label: 'Hangout',
+                icon: Icons.park,
+                onTap: _openHangout,
+              ),
+              _buildGameButton(
+                label: 'Toilet',
+                icon: Icons.wc,
+                onTap: _openToilet,
+              ),
+              _buildGameButton(
+                label: 'Food',
+                icon: Icons.fastfood,
+                onTap: _openFood,
+              ),
+              _buildGameButton(
+                label: 'Cleaner',
+                icon: Icons.delete_sweep,
+                onTap: _openCleaner,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScannerSection() {
+    return SizedBox(
+      height: 380,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: MobileScanner(
+              controller: controller,
+              onDetect: (capture) {
+                for (final barcode in capture.barcodes) {
+                  final raw = barcode.rawValue;
+                  if (raw != null) {
+                    _handleQRCode(raw);
+                    break;
+                  }
+                }
+              },
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: QRFramePainter(),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 20,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.70),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Scan a QR code or use the buttons below',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -117,45 +294,15 @@ class _QRScannerPageState extends State<QRScannerPage> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          MobileScanner(
-            controller: controller,
-            onDetect: (capture) {
-              for (final barcode in capture.barcodes) {
-                final raw = barcode.rawValue;
-                if (raw != null) {
-                  _handleQRCode(raw);
-                  break;
-                }
-              }
-            },
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              _buildScannerSection(),
+              _buildQuickAccessPanel(),
+            ],
           ),
-          // Semi-transparent overlay met frame
-          Positioned.fill(
-            child: IgnorePointer(child: CustomPaint(painter: QRFramePainter())),
-          ),
-          // Info text
-          Positioned(
-            bottom: 40,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Scan een QR code om een minigame te spelen',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 16),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -167,7 +314,7 @@ class QRFramePainter extends CustomPainter {
     final width = size.width;
     final height = size.height;
 
-    const frameSize = 250.0;
+    const frameSize = 220.0;
     final frameLeft = (width - frameSize) / 2;
     final frameTop = (height - frameSize) / 2;
 
