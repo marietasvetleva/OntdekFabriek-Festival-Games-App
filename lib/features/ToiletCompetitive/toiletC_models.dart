@@ -1,12 +1,27 @@
 enum CompetitivePlayerId { p1, p2 }
 
+/// The bin assigned to a player for this round.
+enum BinType {
+  organic,
+  recycling,
+}
+
+/// Trash category used for game rules.
+enum WasteType {
+  organic,
+  recycling,
+  unrecyclable,
+}
+
 enum CompetitiveItemType {
-  bananaPeel, //good
-  leaf, //good
-  compost, //good
-  sawdust, //good
-  cigaretteBud, //bad
-  gum, //bad
+  cigaretteBud,
+  gum,
+  bananaPeel,
+  appleCore,
+  leaf,
+  metalCan,
+  juiceBox,
+  waterBottle,
 }
 
 /// Result of a player trying to deposit an item.
@@ -27,6 +42,10 @@ class GameConfig {
   final int pointsCorrect;
   final int penaltyWrong;
   final int penaltyMissed;
+  final BinType playerOneBin;
+  final BinType playerTwoBin;
+  final double organicSpawnShare;
+  final double recyclingSpawnShare;
 
   const GameConfig({
     this.gameDurationSec = 60,
@@ -38,12 +57,17 @@ class GameConfig {
     this.pointsCorrect = 1,
     this.penaltyWrong = 1,
     this.penaltyMissed = 0,
+    this.playerOneBin = BinType.organic,
+    this.playerTwoBin = BinType.recycling,
+    this.organicSpawnShare = 0.45,
+    this.recyclingSpawnShare = 0.45,
   });
 }
 
 /// Runtime player stats for the competitive round.
 class CompetitivePlayerState {
   final CompetitivePlayerId id;
+  final BinType binType;
   int lives;
   int score;
   int correct;
@@ -51,6 +75,7 @@ class CompetitivePlayerState {
 
   CompetitivePlayerState({
     required this.id,
+    required this.binType,
     required this.lives,
     this.score = 0,
     this.correct = 0,

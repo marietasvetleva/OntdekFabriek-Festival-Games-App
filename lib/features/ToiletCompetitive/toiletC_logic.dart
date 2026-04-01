@@ -21,10 +21,12 @@ class ToiletCompetitiveLogic {
       players: {
         CompetitivePlayerId.p1: CompetitivePlayerState(
           id: CompetitivePlayerId.p1,
+          binType: config.playerOneBin,
           lives: config.startLives,
         ),
         CompetitivePlayerId.p2: CompetitivePlayerState(
           id: CompetitivePlayerId.p2,
+          binType: config.playerTwoBin,
           lives: config.startLives,
         ),
       },
@@ -98,7 +100,7 @@ class ToiletCompetitiveLogic {
     state.activeItems.remove(item);
     final player = state.players[playerId]!;
 
-    if (isGoodItem(item.type)) {
+    if (isCorrectForPlayer(player.binType, item.type)) {
       player.score += config.pointsCorrect;
       player.correct += 1;
       return DepositOutcome.correct;
@@ -140,8 +142,21 @@ class ToiletCompetitiveLogic {
     return null;
   }
 
-  /// Whether this item type counts as a correct compost-toilet deposit.
-  bool isGoodItem(CompetitiveItemType type) => _isGood(type);
+  /// Returns the waste category for an item type.
+  WasteType wasteTypeForItem(CompetitiveItemType type) => _wasteTypeOf(type);
+
+  /// Keeps UI compatibility: true for scorable items, false for unrecyclable.
+  bool isGoodItem(CompetitiveItemType type) {
+    return wasteTypeForItem(type) != WasteType.unrecyclable;
+  }
+
+  /// True when the given item matches the player's assigned bin.
+  bool isCorrectForPlayer(BinType playerBin, CompetitiveItemType itemType) {
+    final wasteType = wasteTypeForItem(itemType);
+    if (wasteType == WasteType.unrecyclable) return false;
+    return (playerBin == BinType.organic && wasteType == WasteType.organic) ||
+        (playerBin == BinType.recycling && wasteType == WasteType.recycling);
+  }
 
   /// How far through its TTL the item is: 0 at spawn, 1 when expired.
   double itemAgeProgress(
@@ -232,29 +247,56 @@ class ToiletCompetitiveLogic {
     }
   }
 
-  /// Rolls random item type (good items are slightly more frequent).
+  /// Rolls random item type with fair category shares by default.
   CompetitiveItemType _rollItemType() {
-    const good = <CompetitiveItemType>[
+    const organicItems = <CompetitiveItemType>[
       CompetitiveItemType.bananaPeel,
+      CompetitiveItemType.appleCore,
       CompetitiveItemType.leaf,
-      CompetitiveItemType.compost,
-      CompetitiveItemType.sawdust,
     ];
-    const bad = <CompetitiveItemType>[
+    const recyclingItems = <CompetitiveItemType>[
+      CompetitiveItemType.metalCan,
+      CompetitiveItemType.juiceBox,
+      CompetitiveItemType.waterBottle,
+    ];
+    const unrecyclableItems = <CompetitiveItemType>[
       CompetitiveItemType.cigaretteBud,
       CompetitiveItemType.gum,
     ];
 
-    final pickGood = _rng.nextDouble() < 0.68;
-    final pool = pickGood ? good : bad;
-    return pool[_rng.nextInt(pool.length)];
+    final organicShare = config.organicSpawnShare.clamp(0.0, 1.0);
+    final recyclingShare = config.recyclingSpawnShare.clamp(0.0, 1.0);
+    final totalShare = organicShare + recyclingShare;
+    final normalizedOrganic = totalShare > 0 ? organicShare / totalShare : 0.5;
+    final normalizedRecycling =
+        totalShare > 0 ? recyclingShare / totalShare : 0.5;
+
+    final unrecyclableShare = (1.0 - totalShare).clamp(0.0, 1.0);
+    final r = _rng.nextDouble();
+
+    if (r < normalizedOrganic * (1 - unrecyclableShare)) {
+      return organicItems[_rng.nextInt(organicItems.length)];
+    }
+    if (r < (normalizedOrganic + normalizedRecycling) * (1 - unrecyclableShare)) {
+      return recyclingItems[_rng.nextInt(recyclingItems.length)];
+    }
+    return unrecyclableItems[_rng.nextInt(unrecyclableItems.length)];
   }
 
-  /// Checks whether an item counts as correct trash.
-  bool _isGood(CompetitiveItemType type) {
-    return type == CompetitiveItemType.bananaPeel ||
-        type == CompetitiveItemType.leaf ||
-        type == CompetitiveItemType.compost ||
-        type == CompetitiveItemType.sawdust;
+  /// Maps concrete items to their bin category.
+  WasteType _wasteTypeOf(CompetitiveItemType type) {
+    switch (type) {
+      case CompetitiveItemType.bananaPeel:
+      case CompetitiveItemType.appleCore:
+      case CompetitiveItemType.leaf:
+        return WasteType.organic;
+      case CompetitiveItemType.metalCan:
+      case CompetitiveItemType.juiceBox:
+      case CompetitiveItemType.waterBottle:
+        return WasteType.recycling;
+      case CompetitiveItemType.cigaretteBud:
+      case CompetitiveItemType.gum:
+        return WasteType.unrecyclable;
+    }
   }
 }

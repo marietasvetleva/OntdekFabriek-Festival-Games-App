@@ -36,10 +36,21 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
   static const String _bgAsset = 'assets/ToiletCompetitive/bg.png';
   static const String _bucketAssetLeft = 'assets/ToiletCompetitive/bucket_left.png';
-  static const String _bucketAssetRight =
-      'assets/ToiletCompetitive/bucket_right.png';
-  static const String _goodTrashAsset = 'assets/ToiletCompetitive/good_trash.png';
-  static const String _badTrashAsset = 'assets/ToiletCompetitive/cigarette.png';
+  static const String _bucketAssetRight = 'assets/ToiletCompetitive/bucket_right.png';
+  static const String _cigaretteAsset =
+      'assets/ToiletCompetitive/items/cigarette_bud.png';
+  static const String _gumAsset = 'assets/ToiletCompetitive/items/gum.png';
+  static const String _bananaPeelAsset =
+      'assets/ToiletCompetitive/items/banana_peel.png';
+  static const String _appleCoreAsset =
+      'assets/ToiletCompetitive/items/apple_core.png';
+  static const String _leafAsset = 'assets/ToiletCompetitive/items/leaf.png';
+  static const String _metalCanAsset =
+      'assets/ToiletCompetitive/items/metal_can.png';
+  static const String _juiceBoxAsset =
+      'assets/ToiletCompetitive/items/juice_box.png';
+  static const String _waterBottleAsset =
+      'assets/ToiletCompetitive/items/water_bottle.png';
 
   static const String _sfxGoodCatch =
       'https://assets.mixkit.co/active_storage/sfx/270/270-preview.mp3';
@@ -195,13 +206,50 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   String _assetForType(CompetitiveItemType type) {
     switch (type) {
       case CompetitiveItemType.cigaretteBud:
+        return _cigaretteAsset;
       case CompetitiveItemType.gum:
-        return _badTrashAsset;
+        return _gumAsset;
       case CompetitiveItemType.bananaPeel:
+        return _bananaPeelAsset;
+      case CompetitiveItemType.appleCore:
+        return _appleCoreAsset;
       case CompetitiveItemType.leaf:
-      case CompetitiveItemType.compost:
-      case CompetitiveItemType.sawdust:
-        return _goodTrashAsset;
+        return _leafAsset;
+      case CompetitiveItemType.metalCan:
+        return _metalCanAsset;
+      case CompetitiveItemType.juiceBox:
+        return _juiceBoxAsset;
+      case CompetitiveItemType.waterBottle:
+        return _waterBottleAsset;
+    }
+  }
+
+  Color _bubbleColorForType(CompetitiveItemType type) {
+    switch (_logic.wasteTypeForItem(type)) {
+      case WasteType.organic:
+        return const Color(0xFF7CCB63);
+      case WasteType.recycling:
+        return const Color(0xFF7DB7F4);
+      case WasteType.unrecyclable:
+        return const Color(0xFFC88D7A);
+    }
+  }
+
+  Color _binTintFor(BinType binType) {
+    switch (binType) {
+      case BinType.organic:
+        return const Color(0xFFAEDC9B);
+      case BinType.recycling:
+        return const Color(0xFFFFC16A);
+    }
+  }
+
+  String _binLabelFor(BinType binType) {
+    switch (binType) {
+      case BinType.organic:
+        return 'ORGANIC';
+      case BinType.recycling:
+        return 'RECYCLING';
     }
   }
 
@@ -383,9 +431,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
             path: _assetForType(item.type),
             width: sz,
             height: sz,
-            fallbackColor: _logic.isGoodItem(item.type)
-                ? const Color(0xFFDCD3A6)
-                : const Color(0xFFC88D7A),
+            fallbackColor: _bubbleColorForType(item.type),
             shape: BoxShape.circle,
           ),
         ),
@@ -408,9 +454,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
             path: _assetForType(item.type),
             width: sz,
             height: sz,
-            fallbackColor: _logic.isGoodItem(item.type)
-                ? const Color(0xFFDCD3A6)
-                : const Color(0xFFC88D7A),
+            fallbackColor: _bubbleColorForType(item.type),
             shape: BoxShape.circle,
           ),
         ),
@@ -446,7 +490,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 const Text(
                   'Links = Speler 1, Rechts = Speler 2.\n'
                   'Sleep afval naar je eigen emmer.\n'
-                  'Sigaret of kauwgom in je emmer = hart kwijt.',
+                  'Foute bak of niet-recyclebaar afval = hart kwijt.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16),
                 ),
@@ -551,21 +595,53 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
               Positioned(
                 left: p1Bucket.left,
                 top: p1Bucket.top,
-                child: _imageOrFallback(
-                  path: _bucketAssetLeft,
-                  width: p1Bucket.width,
-                  height: p1Bucket.height,
-                  fallbackColor: const Color(0xFFCFE7CF),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    _imageOrFallback(
+                      path: _bucketAssetLeft,
+                      width: p1Bucket.width,
+                      height: p1Bucket.height,
+                      fallbackColor: _binTintFor(p1.binType),
+                    ),
+                    Positioned(
+                      top: 8,
+                      child: Text(
+                        _binLabelFor(p1.binType),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1E2A1F),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Positioned(
                 left: p2Bucket.left,
                 top: p2Bucket.top,
-                child: _imageOrFallback(
-                  path: _bucketAssetRight,
-                  width: p2Bucket.width,
-                  height: p2Bucket.height,
-                  fallbackColor: const Color(0xFFCFE7CF),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    _imageOrFallback(
+                      path: _bucketAssetRight,
+                      width: p2Bucket.width,
+                      height: p2Bucket.height,
+                      fallbackColor: _binTintFor(p2.binType),
+                    ),
+                    Positioned(
+                      top: 8,
+                      child: Text(
+                        _binLabelFor(p2.binType),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1E2A1F),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Positioned(
