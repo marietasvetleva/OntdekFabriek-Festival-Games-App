@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'HangOutGame.dart';
 import 'stage_page.dart';
-import 'ToiletGame.dart';
+import 'features/ToiletCompetitive/toiletC_page.dart';
 import 'FoodGame.dart';
 import 'FestivalCleanerApp.dart';
 import 'services/led_service.dart';
@@ -69,7 +69,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
 
     // Toilet
     if (v.contains('toilet') || v.contains('wc')) {
-      await _navigate(const ToiletGamePage());
+      await _navigate(const ToiletCompetitivePage());
       return;
     }
 
@@ -141,17 +141,27 @@ class _QRScannerPageState extends State<QRScannerPage> {
             left: 0,
             right: 0,
             child: Center(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Scan een QR code om een minigame te spelen',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 16),
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Scan een QR code om een minigame te spelen',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: () => _navigate(const ToiletCompetitivePage()),
+                    child: const Text('Test Toilet Competitive'),
+                  ),
+                ],
               ),
             ),
           ),

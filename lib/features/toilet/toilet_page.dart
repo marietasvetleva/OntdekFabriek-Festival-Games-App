@@ -1,12 +1,15 @@
 import 'dart:async';
-import 'dart:math';
+
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:audioplayers/audioplayers.dart';
-import 'ui_styles.dart';
-import 'services/led_service.dart';
-import 'CompostCatchGame.dart'; // Changed import
 
+import '../../CompostCatchGame.dart';
+import '../../services/led_service.dart';
+import '../../ui_styles.dart';
+import 'toilet_logic.dart';
+
+/// UI layer for Toilet game: rendering, timers, and dialogs only.
 class ToiletGamePage extends StatefulWidget {
   const ToiletGamePage({super.key});
 
@@ -15,62 +18,23 @@ class ToiletGamePage extends StatefulWidget {
 }
 
 class _ToiletGamePageState extends State<ToiletGamePage> {
-  final Random _rnd = Random();
-  final List<_FallingItem> _items = [];
   final AudioPlayer _audioPlayer = AudioPlayer();
+  final ToiletGameLogic _logic = ToiletGameLogic();
 
-  String? _feedbackMessage;
-  bool _feedbackIsGood = false;
   Timer? _feedbackTimer;
-
   Timer? _gameTimer;
   Timer? _spawnTimer;
-
-  double _bucketX = 0;
-  double _bucketWidth = 100;
-  double _bucketY = 0;
-
-  // Players score
-  int _hearts = 3;
-  int _itemsCaught = 0; // Track items caught (0-10)
-  bool _isRunning = true;
-  bool _winGame = false;
-  bool _gameOver = false;
-
-  bool _showIntro = true;
-
-  static const int targetToFill = 10;
-  static const int numSlots = 3;
-  static const double slotWidth = 100;
-  static const double slotHeight = 100;
-
-  // Top slots
-  late List<_SlotItem?> _slots;
-
-  static final List<_ItemSpec> _specs = <_ItemSpec>[
-    _ItemSpec('bananapeel', 'assets/ToiletImage/Bananapeel.png', true),
-    _ItemSpec('compost', 'assets/ToiletImage/Compost.png', true),
-    _ItemSpec('leaf', 'assets/ToiletImage/Leaf.png', true),
-    _ItemSpec('sawdust', 'assets/ToiletImage/Sawdust.png', true),
-    _ItemSpec('sigaret', 'assets/ToiletImage/Sigaret.png', false),
-    _ItemSpec('chewingum', 'assets/ToiletImage/Chewingum.png', false),
-  ];
+  late final state = _logic.createInitialState();
 
   @override
   void initState() {
     super.initState();
-    _slots = List<_SlotItem?>.filled(numSlots, null);
 
-    // Check assets in console
-    for (final s in _specs) {
+    for (final s in _logic.specs) {
       rootBundle
           .load(s.asset)
-          .then((_) {
-            debugPrint('FOUND: ${s.asset}');
-          })
-          .catchError((e) {
-            debugPrint('MISSING: ${s.asset} -> $e');
-          });
+          .then((_) => debugPrint('FOUND: ${s.asset}'))
+          .catchError((e) => debugPrint('MISSING: ${s.asset} -> $e'));
     }
     rootBundle.load('assets/ToiletImage/Bucket.png');
     rootBundle.load('assets/ToiletImage/Sun.png');
@@ -79,196 +43,77 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
     LedService.markMinigameOpened('toilet');
   }
 
+  double get _screenWidth => MediaQuery.of(context).size.width;
+  double get _screenHeight => MediaQuery.of(context).size.height;
+
+  /// Starts a fresh round and boots spawn/update timers.
   void _startGame() {
     if (!mounted) return;
     setState(() {
-      _showIntro = false;
-      _isRunning = true;
-      _hearts = 3;
-      _itemsCaught = 0;
-      _items.clear();
-      _slots = List<_SlotItem?>.filled(numSlots, null);
-
-      // Initialize slots with random items
-      for (int i = 0; i < numSlots; i++) {
-        _slots[i] = _createSlotItem();
-      }
+      _logic.startGame(state);
     });
 
-    // Item spawner - fill empty slots
     _spawnTimer?.cancel();
     _spawnTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      if (!_isRunning || !mounted) return;
+      if (!state.isRunning || !mounted) return;
       setState(() {
-        for (int i = 0; i < numSlots; i++) {
-          if (_slots[i] == null) {
-            _slots[i] = _createSlotItem();
-          }
-        }
+        _logic.fillEmptySlots(state);
       });
     });
 
-    // Main loop
     _gameTimer?.cancel();
     _gameTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
-      if (!_isRunning || !mounted) return;
+      if (!state.isRunning || !mounted) return;
       _updateGame(16 / 1000);
     });
   }
 
-  double get _screenWidth => MediaQuery.of(context).size.width;
-  double get _screenHeight => MediaQuery.of(context).size.height;
-
-  _SlotItem _createSlotItem() {
-    final spec = _specs[_rnd.nextInt(_specs.length)];
-    return _SlotItem(spec: spec);
-  }
-
-  void _onSlotTapped(int slotIndex) {
-    if (!_isRunning || _slots[slotIndex] == null) return;
-
-    final item = _slots[slotIndex]!;
-    final randomX = _rnd.nextDouble() * (_screenWidth - 36);
-
-    setState(() {
-      _items.add(
-        _FallingItem(
-          x: randomX,
-          y: 100 + slotHeight,
-          size: 36,
-          speed: 200 + _rnd.nextDouble() * 100,
-          spec: item.spec,
-        ),
-      );
-      _slots[slotIndex] = null;
-    });
-  }
-
+  /// Runs one frame update by delegating gameplay decisions to logic.
   void _updateGame(double dt) {
     setState(() {
-      _bucketX = _bucketX.clamp(0.0, _screenWidth - _bucketWidth - 120);
-      _bucketY = _screenHeight - 160;
+      final completePoints = _logic.tick(
+        state: state,
+        dt: dt,
+        screenWidth: _screenWidth,
+        screenHeight: _screenHeight,
+      );
 
-      for (final it in _items) {
-        it.y += it.speed * dt;
-      }
-
-      final caught = <_FallingItem>[];
-      final remove = <_FallingItem>[];
-
-      for (final it in _items) {
-        bool caughtByBucket = _checkCollision(it, _bucketX);
-
-        if (caughtByBucket) {
-          caught.add(it);
-        } else if (it.y > _screenHeight + 60) {
-          remove.add(it);
-        }
-      }
-
-      for (final it in caught) {
-        _items.remove(it);
+      if (state.feedbackMessage != null) {
         _audioPlayer.play(AssetSource('ToiletImage/GoodToilet.mp3'));
-
         _feedbackTimer?.cancel();
-        if (it.spec.good) {
-          _feedbackIsGood = true;
-          _itemsCaught++; // Increment items caught (visual counter)
-          if (_itemsCaught >= targetToFill) {
-            _isRunning = false;
-            _winGame = true;
-          }
-        } else {
-          _feedbackIsGood = false;
-          _hearts--;
-          if (_hearts <= 0) {
-            _isRunning = false;
-            _gameOver = true;
-          }
-        }
-        _feedbackMessage = 'show';
         _feedbackTimer = Timer(const Duration(milliseconds: 600), () {
           if (mounted) {
             setState(() {
-              _feedbackMessage = null;
+              state.feedbackMessage = null;
             });
           }
         });
       }
 
-      for (final it in remove) {
-        _items.remove(it);
+      if (completePoints != null) {
+        _completeGame(completePoints);
       }
     });
-
-    // Call game completion outside setState
-    if (_winGame) {
-      _winGame = false;
-      final backendPoints = (_itemsCaught * 0.5).round().clamp(0, 5);
-      _completeGame(backendPoints);
-    } else if (_gameOver) {
-      _gameOver = false;
-      final backendPoints = (_itemsCaught * 0.5).round().clamp(0, 5);
-      _completeGame(backendPoints);
-    }
   }
 
-  bool _checkCollision(_FallingItem it, double bucketX) {
-    final bucketLeft = bucketX;
-    final bucketRight = bucketX + _bucketWidth;
-    final itemLeft = it.x;
-    final itemRight = it.x + it.size;
-    final bucketTop = _bucketY;
-    final itemBottom = it.y + it.size;
-
-    final verticalOverlap = itemBottom >= bucketTop + 10;
-    final horizontalOverlap =
-        !(itemRight < bucketLeft || itemLeft > bucketRight);
-    return verticalOverlap && horizontalOverlap;
-  }
-
+  /// Sends score to backend and shows completion dialog.
   Future<void> _completeGame(int points) async {
     if (!mounted) return;
     _audioPlayer.play(AssetSource('ToiletImage/WinToilet.mp3'));
 
-    // Cap the points at 5 maximum
     final cappedPoints = points.clamp(0, 5);
-
-    debugPrint('🎉 TOILET GAME WON! Registering $cappedPoints points');
-
-    // Registreer score via completeMinigame
     try {
       await LedService.completeMinigame('toilet', cappedPoints);
-      debugPrint('✅ Toilet game completed with $cappedPoints points');
     } catch (e) {
-      debugPrint('❌ Error registering toilet score: $e');
+      debugPrint('Error registering toilet score: $e');
     }
 
+    if (!mounted) return;
     await showDialog(
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Je hebt gewonnen!'),
         content: Text('Goed gedaan! +$cappedPoints punten'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(c).pop();
-              Navigator.of(context).pop();
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showGameOver() async {
-    if (!mounted) return;
-    await showDialog(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Game over'),
-        content: const Text('Je hebt alle levens verloren.'),
         actions: [
           TextButton(
             onPressed: () {
@@ -293,8 +138,7 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Show intro/instructions until player starts the game
-    if (_showIntro) {
+    if (state.showIntro) {
       return Scaffold(
         appBar: AppBar(title: const Text('Toilet Game')),
         backgroundColor: const Color.fromARGB(255, 139, 210, 142),
@@ -323,7 +167,6 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
                 ),
               ),
             ),
-            // Secret button in bottom right corner
             Positioned(
               bottom: 16,
               right: 16,
@@ -355,7 +198,6 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
       backgroundColor: const Color.fromARGB(255, 135, 206, 235),
       body: Stack(
         children: [
-          // Background elements
           Positioned(
             top: 30,
             left: 0,
@@ -395,30 +237,34 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
               ),
             ),
           ),
-
-          // Top slots
           Positioned(
             top: 100,
             left: 0,
             right: 0,
             child: SizedBox(
-              height: slotHeight,
+              height: ToiletGameLogic.slotHeight,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(numSlots, (i) {
+                children: List.generate(ToiletGameLogic.numSlots, (i) {
                   return Listener(
-                    onPointerDown: (_) => _onSlotTapped(i),
+                    onPointerDown: (_) => setState(() {
+                      _logic.onSlotTapped(
+                        state: state,
+                        slotIndex: i,
+                        screenWidth: _screenWidth,
+                      );
+                    }),
                     child: Container(
-                      width: slotWidth,
-                      height: slotHeight,
+                      width: ToiletGameLogic.slotWidth,
+                      height: ToiletGameLogic.slotHeight,
                       decoration: BoxDecoration(
                         color: Colors.brown.shade100,
                         border: Border.all(color: Colors.brown, width: 2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: _slots[i] != null
+                      child: state.slots[i] != null
                           ? Image.asset(
-                              _slots[i]!.spec.asset,
+                              state.slots[i]!.spec.asset,
                               fit: BoxFit.contain,
                             )
                           : const SizedBox(),
@@ -428,9 +274,7 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
               ),
             ),
           ),
-
-          // Falling items
-          for (final it in _items)
+          for (final it in state.items)
             Positioned(
               left: it.x,
               top: it.y,
@@ -440,29 +284,26 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
                 child: Image.asset(it.spec.asset, fit: BoxFit.contain),
               ),
             ),
-
-          // Player bucket (catcher)
           Positioned(
-            left: _bucketX,
-            top: _bucketY,
+            left: state.bucketX,
+            top: state.bucketY,
             child: Listener(
               onPointerMove: (details) {
                 setState(() {
-                  _bucketX = (_bucketX + details.delta.dx).clamp(
-                    0.0,
-                    _screenWidth - _bucketWidth - 120,
+                  _logic.moveBucketBy(
+                    state: state,
+                    deltaX: details.delta.dx,
+                    screenWidth: _screenWidth,
                   );
                 });
               },
               child: SizedBox(
-                width: _bucketWidth,
+                width: ToiletGameLogic.bucketWidth,
                 height: 80,
                 child: Image.asset('assets/ToiletImage/Bucket.png'),
               ),
             ),
           ),
-
-          // Hearts
           Positioned(
             top: 60,
             left: 0,
@@ -471,7 +312,7 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(3, (i) {
-                  final alive = i < _hearts;
+                  final alive = i < state.hearts;
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Icon(
@@ -484,8 +325,6 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
               ),
             ),
           ),
-
-          // Score bar (rechts)
           Positioned(
             right: 20,
             top: 100,
@@ -500,10 +339,10 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // Filled portion
                   Container(
                     width: double.infinity,
-                    height: (400 - 8) * (_itemsCaught / targetToFill),
+                    height:
+                        (400 - 8) * (state.itemsCaught / ToiletGameLogic.targetToFill),
                     decoration: BoxDecoration(
                       color: Colors.brown.shade600,
                       borderRadius: const BorderRadius.only(
@@ -516,8 +355,6 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
               ),
             ),
           ),
-
-          // Score text
           Positioned(
             right: 20,
             top: 510,
@@ -525,7 +362,7 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
               width: 60,
               alignment: Alignment.center,
               child: Text(
-                '$_itemsCaught/$targetToFill',
+                '${state.itemsCaught}/${ToiletGameLogic.targetToFill}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -546,33 +383,3 @@ class _ToiletGamePageState extends State<ToiletGamePage> {
     );
   }
 }
-
-class _ItemSpec {
-  final String name;
-  final String asset;
-  final bool good;
-  const _ItemSpec(this.name, this.asset, this.good);
-}
-
-class _SlotItem {
-  final _ItemSpec spec;
-  _SlotItem({required this.spec});
-}
-
-class _FallingItem {
-  double x;
-  double y;
-  final double size;
-  final double speed;
-  final _ItemSpec spec;
-  int caughtByPlayer = 0;
-
-  _FallingItem({
-    required this.x,
-    required this.y,
-    required this.size,
-    required this.speed,
-    required this.spec,
-  });
-}
-//Github push test
