@@ -474,42 +474,16 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
   }
 
-  List<Widget> _arenaItemWidgets(Rect playArea) {
+  List<Widget> _itemWidgets() {
     final widgets = <Widget>[];
+
     for (final item in _gameState.activeItems) {
-      if (_layouts[item.id]?.draggedByPlayer != null) continue;
       final layout = _layouts[item.id];
       if (layout == null) continue;
-      final sz = _itemSizePixels(item);
-      final scale = _itemArtScaleForType(item.type);
-      widgets.add(
-        Positioned(
-          left: layout.x - playArea.left,
-          top: layout.y - playArea.top,
-          child: Transform.scale(
-            scale: scale,
-            child: _imageOrFallback(
-              path: _assetForType(item.type),
-              width: sz,
-              height: sz,
-              fallbackColor: _bubbleColorForType(item.type),
-              shape: BoxShape.circle,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
-      );
-    }
-    return widgets;
-  }
 
-  List<Widget> _draggedItemWidgets() {
-    final widgets = <Widget>[];
-    for (final item in _gameState.activeItems) {
-      if (_layouts[item.id]?.draggedByPlayer == null) continue;
-      final layout = _layouts[item.id]!;
       final sz = _itemSizePixels(item);
       final scale = _itemArtScaleForType(item.type);
+
       widgets.add(
         Positioned(
           left: layout.x,
@@ -528,6 +502,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         ),
       );
     }
+
     return widgets;
   }
 
@@ -653,17 +628,15 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                       ),
                       borderRadius: BorderRadius.circular(28),
                     ),
-                    child: Stack(
-                      children: _arenaItemWidgets(playArea),
-                    ),
+                    child: const SizedBox.expand(),
                   ),
                 ),
               ),
-              ..._draggedItemWidgets(),
+              ..._itemWidgets(),
               // Scores under the hearts near each side
               Positioned(
                 left: 20,
-                top: 12 + 28 + 8, // hearts top + icon size + small gap
+                top: 12 + 28 + 8,
                 child: Text(
                   'P1: ${p1.score}',
                   style: const TextStyle(
