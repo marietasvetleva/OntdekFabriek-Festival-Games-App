@@ -67,7 +67,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
     }
 
     if (v.contains('hangout')) {
-      await _navigate(HangoutQuizPage());
+      await _navigate(
+        HangoutQuizPage(festivalName: widget.festivalName),
+      );
       return;
     }
 
@@ -126,7 +128,9 @@ class _QRScannerPageState extends State<QRScannerPage> {
   }
 
   Future<void> _openHangout() async {
-    await _navigate(HangoutQuizPage());
+    await _navigate(
+      HangoutQuizPage(festivalName: widget.festivalName),
+    );
   }
 
   Future<void> _openToilet() async {

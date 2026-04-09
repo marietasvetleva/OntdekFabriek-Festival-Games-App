@@ -57,7 +57,11 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _navigateToHangout() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const HangoutQuizPage()),
+      MaterialPageRoute(
+        builder: (_) => HangoutQuizPage(
+          festivalName: widget.festivalName,
+        ),
+      ),
     );
 
     if (!_hangoutCompleted) {
