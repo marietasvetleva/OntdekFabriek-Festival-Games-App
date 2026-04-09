@@ -61,8 +61,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3';
 
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final Random _layoutRandom = Random();
-
   final ToiletCompetitiveLogic _logic = ToiletCompetitiveLogic();
   late ToiletCompetitiveState _gameState;
 
@@ -116,9 +114,11 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       _layouts.putIfAbsent(item.id, () {
         final margin = max(0.0, playArea.width - _itemStartSize);
         final vmargin = max(0.0, playArea.height - _itemStartSize);
+        final xNorm = item.spawnXNorm.clamp(0.0, 1.0);
+        final yNorm = item.spawnYNorm.clamp(0.0, 1.0);
         return _ItemLayout(
-          x: playArea.left + _layoutRandom.nextDouble() * margin,
-          y: playArea.top + _layoutRandom.nextDouble() * vmargin,
+          x: playArea.left + xNorm * margin,
+          y: playArea.top + yNorm * vmargin,
         );
       });
     }

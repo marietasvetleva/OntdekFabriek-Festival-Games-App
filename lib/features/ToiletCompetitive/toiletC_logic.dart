@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'toiletC_models.dart';
 
-/// Core gameplay rules for the 2-player Toilet Competitive minigame.
 class ToiletCompetitiveLogic {
   final GameConfig config;
   final Random _rng;
@@ -12,7 +11,6 @@ class ToiletCompetitiveLogic {
     Random? random,
   }) : _rng = random ?? Random();
 
-  /// Creates an empty state before a round starts.
   ToiletCompetitiveState createInitialState() {
     return ToiletCompetitiveState(
       elapsedSec: 0,
@@ -31,18 +29,17 @@ class ToiletCompetitiveLogic {
         ),
       },
       activeItems: <CompetitiveItemSpawn>[],
-      nextSpawnAtSec: 0,
+      nextSpawnCheckAtSec: 0,
       idCounter: 0,
     );
   }
 
-  /// Starts or restarts a match.
   void start(ToiletCompetitiveState state) {
     state.elapsedSec = 0;
     state.running = true;
     state.finished = false;
     state.activeItems.clear();
-    state.nextSpawnAtSec = 0;
+    state.nextSpawnCheckAtSec = 0;
     state.idCounter = 0;
 
     for (final player in state.players.values) {
@@ -53,51 +50,31 @@ class ToiletCompetitiveLogic {
     }
   }
 
-  /// Advances the round timer, spawns new items, expires old ones,
-  /// and ends the game when needed.
+  /// New Whack-A-Mole style tick:
+  /// - update time
+  /// - expire old items
+  /// - on each spawn check, maybe spawn ONE item
+  /// - never dump many items in one frame
   void tick(ToiletCompetitiveState state, double dtSec) {
     if (!state.running || state.finished) return;
 
     state.elapsedSec += dtSec;
 
-    // Stop the game if time is over.
     if (state.elapsedSec >= config.gameDurationSec) {
       state.elapsedSec = config.gameDurationSec.toDouble();
+      _removeExpiredItems(state);
       state.running = false;
       state.finished = true;
-      _removeExpiredItems(state);
       return;
     }
 
-    // Round progress from 0.0 to 1.0
-    final progress =
-        (state.elapsedSec / config.gameDurationSec).clamp(0.0, 1.0);
-
-    // Spawn interval gets smaller over time using exponential interpolation.
-    final currentSpawnInterval =
-        config.startSpawnIntervalSec *
-        pow(config.minSpawnIntervalSec / config.startSpawnIntervalSec, progress).toDouble();
-
-    // Spawn items until we catch up with the current elapsed time.
-    while (state.elapsedSec >= state.nextSpawnAtSec) {
-      // Item TTL also shrinks over time using the same interpolation approach.
-      final currentTtl =
-          config.startTtlSec *
-          pow(config.minTtlSec / config.startTtlSec, progress).toDouble();
-
-      state.activeItems.add(
-        CompetitiveItemSpawn(
-          id: 'i_${state.idCounter++}',
-          type: _rollItemType(),
-          spawnedAtSec: state.elapsedSec,
-          ttlSec: currentTtl,
-        ),
-      );
-
-      state.nextSpawnAtSec += currentSpawnInterval;
-    }
-
     _removeExpiredItems(state);
+
+    // Run spawn checks on a fixed cadence, but only allow one spawn per check.
+    while (state.elapsedSec >= state.nextSpawnCheckAtSec) {
+      _runSpawnCheck(state, state.nextSpawnCheckAtSec);
+      state.nextSpawnCheckAtSec += config.spawnCheckIntervalSec;
+    }
 
     if (isGameOver(state)) {
       state.running = false;
@@ -105,7 +82,110 @@ class ToiletCompetitiveLogic {
     }
   }
 
-  /// Handles a player dropping an item into their bin.
+  void _runSpawnCheck(ToiletCompetitiveState state, double checkTimeSec) {
+    final maxActive = _maxActiveItemsAt(checkTimeSec);
+
+    // If we are already at capacity, do nothing this check.
+    if (state.activeItems.length >= maxActive) return;
+
+    final spawnChance = _spawnChanceAt(checkTimeSec);
+
+    // Only maybe spawn one item.
+    if (_rng.nextDouble() > spawnChance) return;
+
+    final ttlSec = _ttlAt(checkTimeSec);
+
+    final spawnPoint = _pickSpawnPoint(state);
+    state.activeItems.add(
+      CompetitiveItemSpawn(
+        id: 'i_${state.idCounter++}',
+        type: _rollItemType(),
+        spawnedAtSec: checkTimeSec,
+        ttlSec: ttlSec,
+        spawnXNorm: spawnPoint.$1,
+        spawnYNorm: spawnPoint.$2,
+      ),
+    );
+  }
+
+  (double, double) _pickSpawnPoint(ToiletCompetitiveState state) {
+    const minNorm = 0.08;
+    const maxNorm = 0.92;
+    const minDistance = 0.36;
+    const maxAttempts = 12;
+
+    var bestX = minNorm + _rng.nextDouble() * (maxNorm - minNorm);
+    var bestY = minNorm + _rng.nextDouble() * (maxNorm - minNorm);
+    var bestDistance = -1.0;
+
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      final x = minNorm + _rng.nextDouble() * (maxNorm - minNorm);
+      final y = minNorm + _rng.nextDouble() * (maxNorm - minNorm);
+
+      var nearest = double.infinity;
+      for (final item in state.activeItems) {
+        final dx = item.spawnXNorm - x;
+        final dy = item.spawnYNorm - y;
+        final d = sqrt(dx * dx + dy * dy);
+        if (d < nearest) nearest = d;
+      }
+
+      if (state.activeItems.isEmpty || nearest >= minDistance) {
+        return (x, y);
+      }
+      if (nearest > bestDistance) {
+        bestDistance = nearest;
+        bestX = x;
+        bestY = y;
+      }
+    }
+
+    return (bestX, bestY);
+  }
+
+  int _maxActiveItemsAt(double timeSec) {
+    if (timeSec < config.introDurationSec) {
+      return config.startMaxActiveItems;
+    }
+
+    final halfPoint = config.gameDurationSec * 0.55;
+    if (timeSec < halfPoint) {
+      return config.midMaxActiveItems;
+    }
+
+    return config.lateMaxActiveItems;
+  }
+
+  double _spawnChanceAt(double timeSec) {
+    if (timeSec < config.introDurationSec) {
+      return config.startSpawnChance;
+    }
+
+    final halfPoint = config.gameDurationSec * 0.55;
+    if (timeSec < halfPoint) {
+      return config.midSpawnChance;
+    }
+
+    return config.lateSpawnChance;
+  }
+
+  double _ttlAt(double timeSec) {
+    if (timeSec < config.introDurationSec) {
+      return _randomBetween(config.startTtlSec * 0.9, config.startTtlSec * 1.1);
+    }
+
+    final halfPoint = config.gameDurationSec * 0.55;
+    if (timeSec < halfPoint) {
+      return _randomBetween(config.midTtlSec * 0.9, config.midTtlSec * 1.1);
+    }
+
+    return _randomBetween(config.minTtlSec * 0.9, config.minTtlSec * 1.1);
+  }
+
+  double _randomBetween(double min, double max) {
+    return min + _rng.nextDouble() * (max - min);
+  }
+
   DepositOutcome depositItem({
     required ToiletCompetitiveState state,
     required CompetitivePlayerId playerId,
@@ -134,10 +214,9 @@ class ToiletCompetitiveLogic {
 
     if (wasteType != WasteType.unrecyclable &&
         ((player.binType == BinType.organic &&
-        wasteType == WasteType.organic) ||
-        (player.binType == BinType.recycling &&
-        wasteType == WasteType.recycling))) {
-      
+                wasteType == WasteType.organic) ||
+            (player.binType == BinType.recycling &&
+                wasteType == WasteType.recycling))) {
       player.score += config.pointsCorrect;
       player.correct += 1;
       return DepositOutcome.correct;
@@ -154,12 +233,10 @@ class ToiletCompetitiveLogic {
     return DepositOutcome.wrong;
   }
 
-  /// Returns remaining round time in seconds.
   double timeLeftSec(ToiletCompetitiveState state) {
     return max(0, config.gameDurationSec - state.elapsedSec);
   }
 
-  /// Returns true when the match should stop.
   bool isGameOver(ToiletCompetitiveState state) {
     final p1Lives = state.players[CompetitivePlayerId.p1]!.lives;
     final p2Lives = state.players[CompetitivePlayerId.p2]!.lives;
@@ -169,7 +246,6 @@ class ToiletCompetitiveLogic {
         state.elapsedSec >= config.gameDurationSec;
   }
 
-  /// Returns winner by score, then lives; null on exact tie.
   CompetitivePlayerId? winner(ToiletCompetitiveState state) {
     final p1 = state.players[CompetitivePlayerId.p1]!;
     final p2 = state.players[CompetitivePlayerId.p2]!;
@@ -181,7 +257,6 @@ class ToiletCompetitiveLogic {
     return null;
   }
 
-  /// Returns the waste category for an item type.
   WasteType wasteTypeForItem(CompetitiveItemType type) {
     switch (type) {
       case CompetitiveItemType.bananaPeel:
@@ -200,12 +275,10 @@ class ToiletCompetitiveLogic {
     }
   }
 
-  /// Keeps UI compatibility: true for scorable items, false for unrecyclable.
   bool isGoodItem(CompetitiveItemType type) {
     return wasteTypeForItem(type) != WasteType.unrecyclable;
   }
 
-  /// True when the given item matches the player's assigned bin.
   bool isCorrectForPlayer(BinType playerBin, CompetitiveItemType itemType) {
     final wasteType = wasteTypeForItem(itemType);
 
@@ -215,7 +288,6 @@ class ToiletCompetitiveLogic {
         (playerBin == BinType.recycling && wasteType == WasteType.recycling);
   }
 
-  /// How far through its TTL the item is: 0 at spawn, 1 when expired.
   double itemAgeProgress(
     ToiletCompetitiveState state,
     CompetitiveItemSpawn item,
@@ -226,7 +298,6 @@ class ToiletCompetitiveLogic {
     return (age / item.ttlSec).clamp(0.0, 1.0);
   }
 
-  /// Maps TTL progress to a pixel size (large when new, small near expiry).
   double itemDisplaySizePixels({
     required ToiletCompetitiveState state,
     required CompetitiveItemSpawn item,
@@ -237,7 +308,6 @@ class ToiletCompetitiveLogic {
     return maxSize + (minSize - maxSize) * progress;
   }
 
-  /// Removes expired items and applies missed penalties if configured.
   void _removeExpiredItems(ToiletCompetitiveState state) {
     if (state.activeItems.isEmpty) return;
 
@@ -262,7 +332,6 @@ class ToiletCompetitiveLogic {
     }
   }
 
-  /// Rolls one random item type based on configured category shares.
   CompetitiveItemType _rollItemType() {
     const organicItems = <CompetitiveItemType>[
       CompetitiveItemType.bananaPeel,
@@ -285,23 +354,15 @@ class ToiletCompetitiveLogic {
     final recyclingShare = config.recyclingSpawnShare.clamp(0.0, 1.0);
 
     final recyclableTotal = organicShare + recyclingShare;
-
-    final normalizedOrganic = recyclableTotal > 0
-        ? organicShare / recyclableTotal
-        : 0.5;
-
-    final normalizedRecycling = recyclableTotal > 0
-        ? recyclingShare / recyclableTotal
-        : 0.5;
-
+    final normalizedOrganic = recyclableTotal > 0 ? organicShare / recyclableTotal : 0.5;
+    final normalizedRecycling = recyclableTotal > 0 ? recyclingShare / recyclableTotal : 0.5;
     final unrecyclableShare = (1.0 - recyclableTotal).clamp(0.0, 1.0);
 
     final roll = _rng.nextDouble();
 
     final organicThreshold = normalizedOrganic * (1.0 - unrecyclableShare);
     final recyclingThreshold =
-        (normalizedOrganic + normalizedRecycling) *
-        (1.0 - unrecyclableShare);
+        (normalizedOrganic + normalizedRecycling) * (1.0 - unrecyclableShare);
 
     if (roll < organicThreshold) {
       return organicItems[_rng.nextInt(organicItems.length)];
