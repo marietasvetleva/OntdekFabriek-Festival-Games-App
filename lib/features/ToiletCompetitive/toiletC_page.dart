@@ -28,11 +28,12 @@ class ToiletCompetitivePage extends StatefulWidget {
 }
 
 class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
-  static const double _itemMinSize = 18;
-  static const double _itemStartSize = 76;
-  static const double _bucketWidth = 130;
-  static const double _bucketHeight = 92;
-  static const double _bucketBottomMargin = 24;
+  static const double _itemMinSize = 25;
+  static const double _itemStartSize = 150;
+  static const double _bucketWidth = 200;
+  static const double _bucketHeight = 160;
+  static const double _bucketAspect = _bucketWidth / _bucketHeight;
+  static const double _arenaSideGapMin = 14;
 
   static const String _bgAsset = 'assets/ToiletCompetitive/bg.png';
   static const String _bucketAssetLeft = 'assets/ToiletCompetitive/bucket_left.png';
@@ -173,25 +174,62 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     return 'Gelijkspel!';
   }
 
+  Size _bucketSize(Size screen) {
+    // Keep buckets visually similar across phones/tablets and
+    // independent from the arena so we can reserve horizontal space.
+    final height = (screen.height * 0.34).clamp(190.0, 320.0).toDouble();
+    final width = height * _bucketAspect;
+    return Size(width, height);
+  }
+
+  double _arenaSideGap(Size screen) {
+    // A small responsive gap between bucket and arena.
+    return max(_arenaSideGapMin, screen.width * 0.02);
+  }
+
   Rect _playArea(Size size) {
-    final arenaWidth = size.width * 0.72;
-    final arenaHeight = size.height * 0.58;
-    final left = (size.width - arenaWidth) / 2;
-    final top = size.height * 0.19;
+    final bucket = _bucketSize(size);
+    final gap = _arenaSideGap(size);
+
+    // Reserve horizontal space so buckets never overlap the arena.
+    final left = bucket.width + gap;
+    final right = size.width - bucket.width - gap;
+    final arenaWidth = max(0.0, right - left);
+
+    final arenaHeight = size.height * 0.66;
+    final top = size.height * 0.18; // a bit lower under timer
     return Rect.fromLTWH(left, top, arenaWidth, arenaHeight);
   }
 
-  Rect _playerBucketRect(Size size, int player) {
-    final y = size.height - _bucketBottomMargin - _bucketHeight;
+  Rect _playerBucketRect({
+    required Size size,
+    required Rect playArea,
+    required int player,
+  }) {
+    // Buckets centered vertically on each side (like prototype).
+    // Size is derived from the screen so we can guarantee spacing to the arena.
+    final bucket = _bucketSize(size);
+    final height = bucket.height;
+    final width = bucket.width;
+
+    final centerY = playArea.center.dy;
+    final y = (centerY - height / 2).clamp(0.0, size.height - height);
+
     if (player == 1) {
-      return Rect.fromLTWH(16, y, _bucketWidth, _bucketHeight);
+      return Rect.fromLTWH(0, y, width, height);
     }
-    return Rect.fromLTWH(
-      size.width - _bucketWidth - 16,
-      y,
-      _bucketWidth,
-      _bucketHeight,
-    );
+    return Rect.fromLTWH(size.width - width, y, width, height);
+  }
+
+  double _itemArtScaleForType(CompetitiveItemType type) {
+    // Most sprites have extra transparent padding; scale them up a bit to feel tighter.
+    // Banana has less padding, so keep it unscaled to avoid cropping.
+    switch (type) {
+      case CompetitiveItemType.bananaPeel:
+        return 1.0;
+      default:
+        return 1.18;
+    }
   }
 
   double _itemSizePixels(CompetitiveItemSpawn item) {
@@ -317,8 +355,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final player = _pointerOwnerById.remove(pointerId);
     if (player == null) return;
 
-    final p1Bucket = _playerBucketRect(size, 1);
-    final p2Bucket = _playerBucketRect(size, 2);
+    final playArea = _playArea(size);
+    final p1Bucket = _playerBucketRect(size: size, playArea: playArea, player: 1);
+    final p2Bucket = _playerBucketRect(size: size, playArea: playArea, player: 2);
 
     for (final spawn in _gameState.activeItems.toList()) {
       final layout = _layouts[spawn.id];
@@ -378,12 +417,16 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     required double height,
     required Color fallbackColor,
     BoxShape shape = BoxShape.rectangle,
+    BoxFit fit = BoxFit.contain,
+    Alignment alignment = Alignment.center,
+    bool flipX = false,
   }) {
-    return Image.asset(
+    final image = Image.asset(
       path,
       width: width,
       height: height,
-      fit: BoxFit.contain,
+      fit: fit,
+      alignment: alignment,
       errorBuilder: (_, __, ___) {
         return Container(
           width: width,
@@ -396,6 +439,21 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           ),
         );
       },
+    );
+
+    if (shape == BoxShape.circle) {
+      return ClipOval(
+        child: Transform.scale(
+          scale: 1.0,
+          child: image,
+        ),
+      );
+    }
+    if (!flipX) return image;
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.rotationY(pi),
+      child: image,
     );
   }
 
@@ -423,16 +481,21 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       final layout = _layouts[item.id];
       if (layout == null) continue;
       final sz = _itemSizePixels(item);
+      final scale = _itemArtScaleForType(item.type);
       widgets.add(
         Positioned(
           left: layout.x - playArea.left,
           top: layout.y - playArea.top,
-          child: _imageOrFallback(
-            path: _assetForType(item.type),
-            width: sz,
-            height: sz,
-            fallbackColor: _bubbleColorForType(item.type),
-            shape: BoxShape.circle,
+          child: Transform.scale(
+            scale: scale,
+            child: _imageOrFallback(
+              path: _assetForType(item.type),
+              width: sz,
+              height: sz,
+              fallbackColor: _bubbleColorForType(item.type),
+              shape: BoxShape.circle,
+              fit: BoxFit.contain,
+            ),
           ),
         ),
       );
@@ -446,16 +509,21 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       if (_layouts[item.id]?.draggedByPlayer == null) continue;
       final layout = _layouts[item.id]!;
       final sz = _itemSizePixels(item);
+      final scale = _itemArtScaleForType(item.type);
       widgets.add(
         Positioned(
           left: layout.x,
           top: layout.y,
-          child: _imageOrFallback(
-            path: _assetForType(item.type),
-            width: sz,
-            height: sz,
-            fallbackColor: _bubbleColorForType(item.type),
-            shape: BoxShape.circle,
+          child: Transform.scale(
+            scale: scale,
+            child: _imageOrFallback(
+              path: _assetForType(item.type),
+              width: sz,
+              height: sz,
+              fallbackColor: _bubbleColorForType(item.type),
+              shape: BoxShape.circle,
+              fit: BoxFit.contain,
+            ),
           ),
         ),
       );
@@ -467,8 +535,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final playArea = _playArea(size);
-    final p1Bucket = _playerBucketRect(size, 1);
-    final p2Bucket = _playerBucketRect(size, 2);
+    final p1Bucket = _playerBucketRect(size: size, playArea: playArea, player: 1);
+    final p2Bucket = _playerBucketRect(size: size, playArea: playArea, player: 2);
     final p1 = _gameState.players[CompetitivePlayerId.p1]!;
     final p2 = _gameState.players[CompetitivePlayerId.p2]!;
     final secsLeft = _logic.timeLeftSec(_gameState).ceil().clamp(0, 99999);
@@ -592,6 +660,20 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 ),
               ),
               ..._draggedItemWidgets(),
+              // Scores under the hearts near each side
+              Positioned(
+                left: 20,
+                top: 12 + 28 + 8, // hearts top + icon size + small gap
+                child: Text(
+                  'P1: ${p1.score}',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1E2A1F),
+                  ),
+                ),
+              ),
+              // Buckets on top of everything
               Positioned(
                 left: p1Bucket.left,
                 top: p1Bucket.top,
@@ -603,6 +685,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                       width: p1Bucket.width,
                       height: p1Bucket.height,
                       fallbackColor: _binTintFor(p1.binType),
+                      fit: BoxFit.contain,
+                      alignment: Alignment.bottomCenter,
+                      flipX: false,
                     ),
                     Positioned(
                       top: 8,
@@ -629,6 +714,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                       width: p2Bucket.width,
                       height: p2Bucket.height,
                       fallbackColor: _binTintFor(p2.binType),
+                      fit: BoxFit.contain,
+                      alignment: Alignment.bottomCenter,
+                      flipX: false,
                     ),
                     Positioned(
                       top: 8,
@@ -645,20 +733,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 ),
               ),
               Positioned(
-                left: 24,
-                bottom: 8,
-                child: Text(
-                  'P1: ${p1.score}',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1E2A1F),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 24,
-                bottom: 8,
+                right: 20,
+                top: 12 + 28 + 8,
                 child: Text(
                   'P2: ${p2.score}',
                   style: const TextStyle(

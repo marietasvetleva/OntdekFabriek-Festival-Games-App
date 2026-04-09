@@ -79,6 +79,9 @@ flutter:
 
     # Toilet game images
     - assets/ToiletImage/
+    # Toilet Competitive (2-player) images
+    - assets/ToiletCompetitive/
+    - assets/ToiletCompetitive/items/
     - assets/sounds/
 
     # Stage images
