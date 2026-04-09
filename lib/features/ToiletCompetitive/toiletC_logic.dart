@@ -53,25 +53,52 @@ class ToiletCompetitiveLogic {
     }
   }
 
-  /// Advances time, updates spawn pacing, and expires old items.
+  /// Advances the round timer, spawns new items, expires old ones,
+  /// and ends the game when needed.
   void tick(ToiletCompetitiveState state, double dtSec) {
     if (!state.running || state.finished) return;
 
     state.elapsedSec += dtSec;
+
+    // Stop the game if time is over.
     if (state.elapsedSec >= config.gameDurationSec) {
       state.elapsedSec = config.gameDurationSec.toDouble();
       state.running = false;
       state.finished = true;
-      _expireItems(state);
+      _removeExpiredItems(state);
       return;
     }
 
+    // Round progress from 0.0 to 1.0
+    final progress =
+        (state.elapsedSec / config.gameDurationSec).clamp(0.0, 1.0);
+
+    // Spawn interval gets smaller over time using exponential interpolation.
+    final currentSpawnInterval =
+        config.startSpawnIntervalSec *
+        pow(config.minSpawnIntervalSec / config.startSpawnIntervalSec, progress).toDouble();
+
+    // Spawn items until we catch up with the current elapsed time.
     while (state.elapsedSec >= state.nextSpawnAtSec) {
-      _spawnOne(state);
-      state.nextSpawnAtSec += _currentSpawnIntervalSec(state);
+      // Item TTL also shrinks over time using the same interpolation approach.
+      final currentTtl =
+          config.startTtlSec *
+          pow(config.minTtlSec / config.startTtlSec, progress).toDouble();
+
+      state.activeItems.add(
+        CompetitiveItemSpawn(
+          id: 'i_${state.idCounter++}',
+          type: _rollItemType(),
+          spawnedAtSec: state.elapsedSec,
+          ttlSec: currentTtl,
+        ),
+      );
+
+      state.nextSpawnAtSec += currentSpawnInterval;
     }
 
-    _expireItems(state);
+    _removeExpiredItems(state);
+
     if (isGameOver(state)) {
       state.running = false;
       state.finished = true;
@@ -84,23 +111,33 @@ class ToiletCompetitiveLogic {
     required CompetitivePlayerId playerId,
     required String itemId,
   }) {
-    if (!state.running || state.finished) return DepositOutcome.ignored;
+    if (!state.running || state.finished) {
+      return DepositOutcome.ignored;
+    }
 
     CompetitiveItemSpawn? item;
-    for (final it in state.activeItems) {
-      if (it.id == itemId) {
-        item = it;
+    for (final activeItem in state.activeItems) {
+      if (activeItem.id == itemId) {
+        item = activeItem;
         break;
       }
     }
+
     if (item == null) {
       return DepositOutcome.ignored;
     }
 
     state.activeItems.remove(item);
-    final player = state.players[playerId]!;
 
-    if (isCorrectForPlayer(player.binType, item.type)) {
+    final player = state.players[playerId]!;
+    final wasteType = wasteTypeForItem(item.type);
+
+    if (wasteType != WasteType.unrecyclable &&
+        ((player.binType == BinType.organic &&
+        wasteType == WasteType.organic) ||
+        (player.binType == BinType.recycling &&
+        wasteType == WasteType.recycling))) {
+      
       player.score += config.pointsCorrect;
       player.correct += 1;
       return DepositOutcome.correct;
@@ -113,6 +150,7 @@ class ToiletCompetitiveLogic {
       state.running = false;
       state.finished = true;
     }
+
     return DepositOutcome.wrong;
   }
 
@@ -125,6 +163,7 @@ class ToiletCompetitiveLogic {
   bool isGameOver(ToiletCompetitiveState state) {
     final p1Lives = state.players[CompetitivePlayerId.p1]!.lives;
     final p2Lives = state.players[CompetitivePlayerId.p2]!.lives;
+
     return p1Lives <= 0 ||
         p2Lives <= 0 ||
         state.elapsedSec >= config.gameDurationSec;
@@ -135,15 +174,31 @@ class ToiletCompetitiveLogic {
     final p1 = state.players[CompetitivePlayerId.p1]!;
     final p2 = state.players[CompetitivePlayerId.p2]!;
 
+    if (p1.lives <= 0 && p2.lives > 0) return CompetitivePlayerId.p2;
+    if (p2.lives <= 0 && p1.lives > 0) return CompetitivePlayerId.p1;
     if (p1.score > p2.score) return CompetitivePlayerId.p1;
     if (p2.score > p1.score) return CompetitivePlayerId.p2;
-    if (p1.lives > p2.lives) return CompetitivePlayerId.p1;
-    if (p2.lives > p1.lives) return CompetitivePlayerId.p2;
     return null;
   }
 
   /// Returns the waste category for an item type.
-  WasteType wasteTypeForItem(CompetitiveItemType type) => _wasteTypeOf(type);
+  WasteType wasteTypeForItem(CompetitiveItemType type) {
+    switch (type) {
+      case CompetitiveItemType.bananaPeel:
+      case CompetitiveItemType.appleCore:
+      case CompetitiveItemType.leaf:
+        return WasteType.organic;
+
+      case CompetitiveItemType.metalCan:
+      case CompetitiveItemType.juiceBox:
+      case CompetitiveItemType.waterBottle:
+        return WasteType.recycling;
+
+      case CompetitiveItemType.cigaretteBud:
+      case CompetitiveItemType.gum:
+        return WasteType.unrecyclable;
+    }
+  }
 
   /// Keeps UI compatibility: true for scorable items, false for unrecyclable.
   bool isGoodItem(CompetitiveItemType type) {
@@ -153,7 +208,9 @@ class ToiletCompetitiveLogic {
   /// True when the given item matches the player's assigned bin.
   bool isCorrectForPlayer(BinType playerBin, CompetitiveItemType itemType) {
     final wasteType = wasteTypeForItem(itemType);
+
     if (wasteType == WasteType.unrecyclable) return false;
+
     return (playerBin == BinType.organic && wasteType == WasteType.organic) ||
         (playerBin == BinType.recycling && wasteType == WasteType.recycling);
   }
@@ -164,7 +221,8 @@ class ToiletCompetitiveLogic {
     CompetitiveItemSpawn item,
   ) {
     final age = state.elapsedSec - item.spawnedAtSec;
-    if (item.ttlSec <= 0) return 1;
+    if (item.ttlSec <= 0) return 1.0;
+
     return (age / item.ttlSec).clamp(0.0, 1.0);
   }
 
@@ -175,68 +233,25 @@ class ToiletCompetitiveLogic {
     required double maxSize,
     required double minSize,
   }) {
-    final t = itemAgeProgress(state, item);
-    return maxSize + (minSize - maxSize) * t;
-  }
-
-  // ===========================================================================
-  // Helper methods
-  // ===========================================================================
-
-  /// Returns 0..1 progress from round start to end.
-  double _progress(ToiletCompetitiveState state) {
-    return (state.elapsedSec / config.gameDurationSec).clamp(0.0, 1.0);
-  }
-
-  /// Exponential interpolation used for spawn and ttl curves.
-  double _expLerp({
-    required double start,
-    required double end,
-    required double progress,
-  }) {
-    return start * pow(end / start, progress).toDouble();
-  }
-
-  /// Gets current spawn interval based on elapsed time.
-  double _currentSpawnIntervalSec(ToiletCompetitiveState state) {
-    return _expLerp(
-      start: config.startSpawnIntervalSec,
-      end: config.minSpawnIntervalSec,
-      progress: _progress(state),
-    );
-  }
-
-  /// Gets current item TTL based on elapsed time.
-  double _currentTtlSec(ToiletCompetitiveState state) {
-    return _expLerp(
-      start: config.startTtlSec,
-      end: config.minTtlSec,
-      progress: _progress(state),
-    );
-  }
-
-  /// Spawns one random item with current TTL settings.
-  void _spawnOne(ToiletCompetitiveState state) {
-    final item = CompetitiveItemSpawn(
-      id: 'i_${state.idCounter++}',
-      type: _rollItemType(),
-      spawnedAtSec: state.elapsedSec,
-      ttlSec: _currentTtlSec(state),
-    );
-    state.activeItems.add(item);
+    final progress = itemAgeProgress(state, item);
+    return maxSize + (minSize - maxSize) * progress;
   }
 
   /// Removes expired items and applies missed penalties if configured.
-  void _expireItems(ToiletCompetitiveState state) {
+  void _removeExpiredItems(ToiletCompetitiveState state) {
     if (state.activeItems.isEmpty) return;
 
-    final expired = <CompetitiveItemSpawn>[];
-    for (final item in state.activeItems) {
-      if (item.isExpired(state.elapsedSec)) expired.add(item);
-    }
-    if (expired.isEmpty) return;
+    final expiredItems = <CompetitiveItemSpawn>[];
 
-    for (final item in expired) {
+    for (final item in state.activeItems) {
+      if (item.isExpired(state.elapsedSec)) {
+        expiredItems.add(item);
+      }
+    }
+
+    if (expiredItems.isEmpty) return;
+
+    for (final item in expiredItems) {
       state.activeItems.remove(item);
     }
 
@@ -247,18 +262,20 @@ class ToiletCompetitiveLogic {
     }
   }
 
-  /// Rolls random item type with fair category shares by default.
+  /// Rolls one random item type based on configured category shares.
   CompetitiveItemType _rollItemType() {
     const organicItems = <CompetitiveItemType>[
       CompetitiveItemType.bananaPeel,
       CompetitiveItemType.appleCore,
       CompetitiveItemType.leaf,
     ];
+
     const recyclingItems = <CompetitiveItemType>[
       CompetitiveItemType.metalCan,
       CompetitiveItemType.juiceBox,
       CompetitiveItemType.waterBottle,
     ];
+
     const unrecyclableItems = <CompetitiveItemType>[
       CompetitiveItemType.cigaretteBud,
       CompetitiveItemType.gum,
@@ -266,37 +283,34 @@ class ToiletCompetitiveLogic {
 
     final organicShare = config.organicSpawnShare.clamp(0.0, 1.0);
     final recyclingShare = config.recyclingSpawnShare.clamp(0.0, 1.0);
-    final totalShare = organicShare + recyclingShare;
-    final normalizedOrganic = totalShare > 0 ? organicShare / totalShare : 0.5;
-    final normalizedRecycling =
-        totalShare > 0 ? recyclingShare / totalShare : 0.5;
 
-    final unrecyclableShare = (1.0 - totalShare).clamp(0.0, 1.0);
-    final r = _rng.nextDouble();
+    final recyclableTotal = organicShare + recyclingShare;
 
-    if (r < normalizedOrganic * (1 - unrecyclableShare)) {
+    final normalizedOrganic = recyclableTotal > 0
+        ? organicShare / recyclableTotal
+        : 0.5;
+
+    final normalizedRecycling = recyclableTotal > 0
+        ? recyclingShare / recyclableTotal
+        : 0.5;
+
+    final unrecyclableShare = (1.0 - recyclableTotal).clamp(0.0, 1.0);
+
+    final roll = _rng.nextDouble();
+
+    final organicThreshold = normalizedOrganic * (1.0 - unrecyclableShare);
+    final recyclingThreshold =
+        (normalizedOrganic + normalizedRecycling) *
+        (1.0 - unrecyclableShare);
+
+    if (roll < organicThreshold) {
       return organicItems[_rng.nextInt(organicItems.length)];
     }
-    if (r < (normalizedOrganic + normalizedRecycling) * (1 - unrecyclableShare)) {
+
+    if (roll < recyclingThreshold) {
       return recyclingItems[_rng.nextInt(recyclingItems.length)];
     }
-    return unrecyclableItems[_rng.nextInt(unrecyclableItems.length)];
-  }
 
-  /// Maps concrete items to their bin category.
-  WasteType _wasteTypeOf(CompetitiveItemType type) {
-    switch (type) {
-      case CompetitiveItemType.bananaPeel:
-      case CompetitiveItemType.appleCore:
-      case CompetitiveItemType.leaf:
-        return WasteType.organic;
-      case CompetitiveItemType.metalCan:
-      case CompetitiveItemType.juiceBox:
-      case CompetitiveItemType.waterBottle:
-        return WasteType.recycling;
-      case CompetitiveItemType.cigaretteBud:
-      case CompetitiveItemType.gum:
-        return WasteType.unrecyclable;
-    }
+    return unrecyclableItems[_rng.nextInt(unrecyclableItems.length)];
   }
 }
