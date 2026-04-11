@@ -28,44 +28,25 @@ enum DepositOutcome {
   ignored,
 }
 
-/// Tunable values for round duration, pacing and penalties.
-/// This is now Whack-A-Mole style:
-/// - frequent spawn checks
-/// - at most one new item per check
-/// - active item cap changes over time
-/// - TTL shrinks as the round progresses
 class GameConfig {
   final int gameDurationSec;
   final int startLives;
-
-  /// How often the game checks whether it should spawn ONE new item.
   final double spawnCheckIntervalSec;
-
-  /// Intro phase duration where the game stays calmer.
   final double introDurationSec;
-
-  /// Maximum simultaneous items on screen in different phases.
   final int startMaxActiveItems;
   final int midMaxActiveItems;
   final int lateMaxActiveItems;
-
-  /// Chance to spawn one new item when a spawn check happens.
   final double startSpawnChance;
   final double midSpawnChance;
   final double lateSpawnChance;
-
-  /// How long items stay alive in different phases.
   final double startTtlSec;
   final double midTtlSec;
   final double minTtlSec;
-
   final int pointsCorrect;
   final int penaltyWrong;
   final int penaltyMissed;
-
   final BinType playerOneBin;
   final BinType playerTwoBin;
-
   final double organicSpawnShare;
   final double recyclingSpawnShare;
 
@@ -119,6 +100,10 @@ class CompetitiveItemSpawn {
   final double spawnXNorm;
   final double spawnYNorm;
 
+  bool isBeingHeld;
+  double totalHeldSec;
+  double? holdStartedAtSec;
+
   CompetitiveItemSpawn({
     required this.id,
     required this.type,
@@ -126,9 +111,15 @@ class CompetitiveItemSpawn {
     required this.ttlSec,
     this.spawnXNorm = 0.5,
     this.spawnYNorm = 0.5,
+    this.isBeingHeld = false,
+    this.totalHeldSec = 0,
+    this.holdStartedAtSec,
   });
 
-  bool isExpired(double nowSec) => nowSec - spawnedAtSec >= ttlSec;
+  bool isExpired(double nowSec) {
+    final activeAge = nowSec - spawnedAtSec - totalHeldSec;
+    return activeAge >= ttlSec;
+  }
 }
 
 class ToiletCompetitiveState {
@@ -139,9 +130,7 @@ class ToiletCompetitiveState {
   final Map<CompetitivePlayerId, CompetitivePlayerState> players;
   final List<CompetitiveItemSpawn> activeItems;
 
-  /// Time of next spawn check. Not an exact forced spawn.
   double nextSpawnCheckAtSec;
-  // Backward-compatible field for older logic implementations.
   double nextSpawnAtSec;
 
   int idCounter;
