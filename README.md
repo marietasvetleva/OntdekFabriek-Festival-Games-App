@@ -12,7 +12,7 @@ By combining gameplay, decision-making, and visual feedback, the app encourages 
 - Visual & Audio Feedback
 - Role-Based Gameplay
 
-Multiple Mini Games
+**Multiple Mini Games**
 - Hangout
 - Food
 - Toilet
@@ -34,7 +34,8 @@ Multiple Mini Games
 - Jean Bonsink
 
 Fontys University of Applied Sciences
+
 ICT – Mobile App Development
 
-#Stakeholders
+## Stakeholder
 De Ontdek Fabriek
