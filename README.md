@@ -8,6 +8,10 @@ The app consists of a collection of mini games where players take on different r
 By combining gameplay, decision-making, and visual feedback, the app encourages players to make more sustainable choices while understanding real-world festival operations.
 
 ## Features
+- Eco Scoring System
+- Visual & Audio Feedback
+- Role-Based Gameplay
+
 Multiple Mini Games
 - Hangout
 - Food
@@ -15,16 +19,12 @@ Multiple Mini Games
 - Waste (currently under development)
 - Stage (currently under development)
 
-- Eco Scoring System
-- Visual & Audio Feedback
-- Role-Based Gameplay
-
 ## Technologies Used
-Flutter – Mobile app development
-Dart – Programming language
-Figma – UI/UX design and prototyping
-Jira – Project management (Agile/Scrum)
-GitLab – Version control
+- Flutter – Mobile app development
+- Dart – Programming language
+- Figma – UI/UX design and prototyping
+- Jira – Project management (Agile/Scrum)
+- GitLab – Version control
 
 ## Developers
 Andra Ivan
