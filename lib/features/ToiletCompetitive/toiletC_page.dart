@@ -221,6 +221,16 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     return Rect.fromLTWH(size.width - width, y, width, height);
   }
 
+  Rect _bucketCatchRect(Rect bucketRect) {
+    final catchWidth = bucketRect.width * 0.22;
+    final catchHeight = bucketRect.height * 0.14;
+
+    final left = bucketRect.left + (bucketRect.width - catchWidth) / 2;
+    final top = bucketRect.top + bucketRect.height * 0.30;
+
+    return Rect.fromLTWH(left, top, catchWidth, catchHeight);
+  }
+
   double _itemArtScaleForType(CompetitiveItemType type) {
     // Most sprites have extra transparent padding; scale them up a bit to feel tighter.
     // Banana has less padding, so keep it unscaled to avoid cropping.
@@ -358,6 +368,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final playArea = _playArea(size);
     final p1Bucket = _playerBucketRect(size: size, playArea: playArea, player: 1);
     final p2Bucket = _playerBucketRect(size: size, playArea: playArea, player: 2);
+    final p1CatchRect = _bucketCatchRect(p1Bucket);
+    final p2CatchRect = _bucketCatchRect(p2Bucket);
 
     for (final spawn in _gameState.activeItems.toList()) {
       final layout = _layouts[spawn.id];
@@ -368,8 +380,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       final itemRect = Rect.fromLTWH(layout.x, layout.y, sz, sz);
       final bucketOwner = resolveBucketOwner(
         itemRect: itemRect,
-        playerOneBucket: p1Bucket,
-        playerTwoBucket: p2Bucket,
+        playerOneBucket: p1CatchRect,
+        playerTwoBucket: p2CatchRect,
       );
       if (bucketOwner == null) continue;
 
