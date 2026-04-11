@@ -16,7 +16,7 @@ Multiple Mini Games
 - Hangout
 - Food
 - Toilet
-- Waste (currently under development)
+- Trash (currently under development)
 - Stage (currently under development)
 
 ## Technologies Used
@@ -27,11 +27,11 @@ Multiple Mini Games
 - GitLab – Version control
 
 ## Developers
-Andra Ivan
-Ivet Zhelyazkova
-Krasen Savov
-Marieta Svetleva
-Jean Bonsink
+- Andra Ivan
+- Ivet Zhelyazkova
+- Krasen Savov
+- Marieta Svetleva
+- Jean Bonsink
 
 Fontys University of Applied Sciences
 ICT – Mobile App Development
