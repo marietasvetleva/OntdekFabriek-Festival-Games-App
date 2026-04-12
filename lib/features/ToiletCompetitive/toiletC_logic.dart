@@ -50,11 +50,6 @@ class ToiletCompetitiveLogic {
     }
   }
 
-  /// New Whack-A-Mole style tick:
-  /// - update time
-  /// - expire old items
-  /// - on each spawn check, maybe spawn ONE item
-  /// - never dump many items in one frame
   void tick(ToiletCompetitiveState state, double dtSec) {
     if (!state.running || state.finished) return;
 
@@ -70,7 +65,6 @@ class ToiletCompetitiveLogic {
 
     _removeExpiredItems(state);
 
-    // Run spawn checks on a fixed cadence, but only allow one spawn per check.
     while (state.elapsedSec >= state.nextSpawnCheckAtSec) {
       _runSpawnCheck(state, state.nextSpawnCheckAtSec);
       state.nextSpawnCheckAtSec += config.spawnCheckIntervalSec;
@@ -85,12 +79,10 @@ class ToiletCompetitiveLogic {
   void _runSpawnCheck(ToiletCompetitiveState state, double checkTimeSec) {
     final maxActive = _maxActiveItemsAt(checkTimeSec);
 
-    // If we are already at capacity, do nothing this check.
     if (state.activeItems.length >= maxActive) return;
 
     final spawnChance = _spawnChanceAt(checkTimeSec);
 
-    // Only maybe spawn one item.
     if (_rng.nextDouble() > spawnChance) return;
 
     final ttlSec = _ttlAt(checkTimeSec);
@@ -292,7 +284,13 @@ class ToiletCompetitiveLogic {
     ToiletCompetitiveState state,
     CompetitiveItemSpawn item,
   ) {
-    final age = state.elapsedSec - item.spawnedAtSec;
+    var heldSec = item.totalHeldSec;
+
+    if (item.isBeingHeld && item.holdStartedAtSec != null) {
+      heldSec += state.elapsedSec - item.holdStartedAtSec!;
+    }
+
+    final age = state.elapsedSec - item.spawnedAtSec - heldSec;
     if (item.ttlSec <= 0) return 1.0;
 
     return (age / item.ttlSec).clamp(0.0, 1.0);
@@ -314,6 +312,8 @@ class ToiletCompetitiveLogic {
     final expiredItems = <CompetitiveItemSpawn>[];
 
     for (final item in state.activeItems) {
+      if (item.isBeingHeld) continue;
+
       if (item.isExpired(state.elapsedSec)) {
         expiredItems.add(item);
       }
@@ -354,8 +354,10 @@ class ToiletCompetitiveLogic {
     final recyclingShare = config.recyclingSpawnShare.clamp(0.0, 1.0);
 
     final recyclableTotal = organicShare + recyclingShare;
-    final normalizedOrganic = recyclableTotal > 0 ? organicShare / recyclableTotal : 0.5;
-    final normalizedRecycling = recyclableTotal > 0 ? recyclingShare / recyclableTotal : 0.5;
+    final normalizedOrganic =
+        recyclableTotal > 0 ? organicShare / recyclableTotal : 0.5;
+    final normalizedRecycling =
+        recyclableTotal > 0 ? recyclingShare / recyclableTotal : 0.5;
     final unrecyclableShare = (1.0 - recyclableTotal).clamp(0.0, 1.0);
 
     final roll = _rng.nextDouble();

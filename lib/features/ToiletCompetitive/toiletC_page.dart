@@ -10,16 +10,18 @@ import 'toiletC_movement.dart';
 
 enum _GamePhase { intro, running, finished }
 
-/// Screen-space layout for one spawned item (logic only stores id/type/ttl).
 class _ItemLayout {
-  _ItemLayout({required this.x, required this.y});
+  _ItemLayout({
+    required this.x,
+    required this.y,
+  });
 
   double x;
   double y;
   int? draggedByPlayer;
+  double? frozenSize;
 }
 
-/// Two-player competitive trash game.
 class ToiletCompetitivePage extends StatefulWidget {
   const ToiletCompetitivePage({super.key});
 
@@ -95,11 +97,13 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     _frameTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
       if (!mounted || _phase != _GamePhase.running) return;
       final size = MediaQuery.sizeOf(context);
-      final dt = 16 / 1000;
+      const dt = 16 / 1000;
+
       setState(() {
         _logic.tick(_gameState, dt);
         _syncLayoutsForActiveItems(_playArea(size));
       });
+
       if (_gameState.finished) {
         _finishGame();
       }
@@ -116,6 +120,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         final vmargin = max(0.0, playArea.height - _itemStartSize);
         final xNorm = item.spawnXNorm.clamp(0.0, 1.0);
         final yNorm = item.spawnYNorm.clamp(0.0, 1.0);
+
         return _ItemLayout(
           x: playArea.left + xNorm * margin,
           y: playArea.top + yNorm * vmargin,
@@ -134,6 +139,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
   Future<void> _showResultDialog() async {
     if (!mounted) return;
+
     final winnerText = _winnerText();
     final p1 = _gameState.players[CompetitivePlayerId.p1]!;
     final p2 = _gameState.players[CompetitivePlayerId.p2]!;
@@ -166,24 +172,24 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   String _winnerText() {
     final p1 = _gameState.players[CompetitivePlayerId.p1]!;
     final p2 = _gameState.players[CompetitivePlayerId.p2]!;
+
     if (p1.lives <= 0 && p2.lives > 0) return 'Speler 2 wint!';
     if (p2.lives <= 0 && p1.lives > 0) return 'Speler 1 wint!';
+
     final w = _logic.winner(_gameState);
     if (w == CompetitivePlayerId.p1) return 'Speler 1 wint!';
     if (w == CompetitivePlayerId.p2) return 'Speler 2 wint!';
+
     return 'Gelijkspel!';
   }
 
   Size _bucketSize(Size screen) {
-    // Keep buckets visually similar across phones/tablets and
-    // independent from the arena so we can reserve horizontal space.
     final height = (screen.height * 0.34).clamp(190.0, 320.0).toDouble();
     final width = height * _bucketAspect;
     return Size(width, height);
   }
 
   double _arenaSideGap(Size screen) {
-    // A small responsive gap between bucket and arena.
     return max(_arenaSideGapMin, screen.width * 0.02);
   }
 
@@ -191,13 +197,13 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final bucket = _bucketSize(size);
     final gap = _arenaSideGap(size);
 
-    // Reserve horizontal space so buckets never overlap the arena.
     final left = bucket.width + gap;
     final right = size.width - bucket.width - gap;
     final arenaWidth = max(0.0, right - left);
 
     final arenaHeight = size.height * 0.66;
-    final top = size.height * 0.18; // a bit lower under timer
+    final top = size.height * 0.18;
+
     return Rect.fromLTWH(left, top, arenaWidth, arenaHeight);
   }
 
@@ -206,8 +212,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     required Rect playArea,
     required int player,
   }) {
-    // Buckets centered vertically on each side (like prototype).
-    // Size is derived from the screen so we can guarantee spacing to the arena.
     final bucket = _bucketSize(size);
     final height = bucket.height;
     final width = bucket.width;
@@ -218,12 +222,21 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     if (player == 1) {
       return Rect.fromLTWH(0, y, width, height);
     }
+
     return Rect.fromLTWH(size.width - width, y, width, height);
   }
 
+  Rect _bucketCatchRect(Rect bucketRect) {
+    final catchWidth = bucketRect.width * 0.22;
+    final catchHeight = bucketRect.height * 0.14;
+
+    final left = bucketRect.left + (bucketRect.width - catchWidth) / 2;
+    final top = bucketRect.top + bucketRect.height * 0.30;
+
+    return Rect.fromLTWH(left, top, catchWidth, catchHeight);
+  }
+
   double _itemArtScaleForType(CompetitiveItemType type) {
-    // Most sprites have extra transparent padding; scale them up a bit to feel tighter.
-    // Banana has less padding, so keep it unscaled to avoid cropping.
     switch (type) {
       case CompetitiveItemType.bananaPeel:
         return 1.0;
@@ -233,6 +246,11 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   }
 
   double _itemSizePixels(CompetitiveItemSpawn item) {
+    final layout = _layouts[item.id];
+    if (layout?.frozenSize != null) {
+      return layout!.frozenSize!;
+    }
+
     return _logic.itemDisplaySizePixels(
       state: _gameState,
       item: item,
@@ -295,8 +313,10 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     for (final item in _gameState.activeItems.reversed) {
       final layout = _layouts[item.id];
       if (layout == null) continue;
+
       final sz = _itemSizePixels(item);
       final rect = Rect.fromLTWH(layout.x, layout.y, sz, sz);
+
       if (rect.contains(localPosition)) return item;
     }
     return null;
@@ -313,20 +333,40 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
   void _onPointerDown(PointerDownEvent event, Size size) {
     if (_phase != _GamePhase.running) return;
+
     final player = _playerFromPosition(event.localPosition, size);
     if (player == null) return;
+
     _pointerOwnerById[event.pointer] = player;
+
     final spawn = _hitTestItem(event.localPosition);
     if (spawn == null) return;
-    _layouts[spawn.id]?.draggedByPlayer = player;
+
+    final layout = _layouts[spawn.id];
+    if (layout == null) return;
+
+    layout.draggedByPlayer = player;
+    layout.frozenSize ??= _logic.itemDisplaySizePixels(
+      state: _gameState,
+      item: spawn,
+      maxSize: _itemStartSize,
+      minSize: _itemMinSize,
+    );
+
+    if (!spawn.isBeingHeld) {
+      spawn.isBeingHeld = true;
+      spawn.holdStartedAtSec = _gameState.elapsedSec;
+    }
   }
 
   void _onPointerMove(PointerMoveEvent event, Size size) {
     if (_phase != _GamePhase.running) return;
+
     final player = _pointerOwnerById[event.pointer];
     if (player == null) return;
 
     final fullScreen = Rect.fromLTWH(0, 0, size.width, size.height);
+
     for (final item in _gameState.activeItems) {
       final layout = _layouts[item.id];
       if (layout?.draggedByPlayer != player) continue;
@@ -336,14 +376,17 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         event.localPosition.dx - sz / 2,
         event.localPosition.dy - sz / 2,
       );
+
       final clamped = clampDragPosition(
         desiredTopLeft: desired,
         itemSize: sz,
         playArea: fullScreen,
       );
+
       layout!.x = clamped.dx;
       layout.y = clamped.dy;
     }
+
     setState(() {});
   }
 
@@ -352,32 +395,48 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     required Size size,
   }) {
     if (_phase != _GamePhase.running) return;
+
     final player = _pointerOwnerById.remove(pointerId);
     if (player == null) return;
 
     final playArea = _playArea(size);
     final p1Bucket = _playerBucketRect(size: size, playArea: playArea, player: 1);
     final p2Bucket = _playerBucketRect(size: size, playArea: playArea, player: 2);
+    final p1CatchRect = _bucketCatchRect(p1Bucket);
+    final p2CatchRect = _bucketCatchRect(p2Bucket);
 
     for (final spawn in _gameState.activeItems.toList()) {
       final layout = _layouts[spawn.id];
       if (layout?.draggedByPlayer != player) continue;
 
-      layout!.draggedByPlayer = null;
       final sz = _itemSizePixels(spawn);
-      final itemRect = Rect.fromLTWH(layout.x, layout.y, sz, sz);
+      final itemRect = Rect.fromLTWH(layout!.x, layout.y, sz, sz);
+
+      layout.draggedByPlayer = null;
+
+      if (spawn.isBeingHeld && spawn.holdStartedAtSec != null) {
+        spawn.totalHeldSec += _gameState.elapsedSec - spawn.holdStartedAtSec!;
+      }
+      spawn.isBeingHeld = false;
+      spawn.holdStartedAtSec = null;
+
       final bucketOwner = resolveBucketOwner(
         itemRect: itemRect,
-        playerOneBucket: p1Bucket,
-        playerTwoBucket: p2Bucket,
+        playerOneBucket: p1CatchRect,
+        playerTwoBucket: p2CatchRect,
       );
-      if (bucketOwner == null) continue;
+
+      if (bucketOwner == null) {
+        layout.frozenSize = null;
+        continue;
+      }
 
       final outcome = _logic.depositItem(
         state: _gameState,
         playerId: _bucketOwnerToPlayerId(bucketOwner),
         itemId: spawn.id,
       );
+
       switch (outcome) {
         case DepositOutcome.correct:
           _safePlaySfx(_sfxGoodCatch);
@@ -388,6 +447,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         case DepositOutcome.ignored:
           break;
       }
+
+      _layouts.remove(spawn.id);
     }
 
     setState(() {
@@ -403,6 +464,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     try {
       final isUrl =
           assetPath.startsWith('http://') || assetPath.startsWith('https://');
+
       if (isUrl) {
         await _audioPlayer.play(UrlSource(assetPath));
       } else {
@@ -442,14 +504,11 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
 
     if (shape == BoxShape.circle) {
-      return ClipOval(
-        child: Transform.scale(
-          scale: 1.0,
-          child: image,
-        ),
-      );
+      return ClipOval(child: image);
     }
+
     if (!flipX) return image;
+
     return Transform(
       alignment: Alignment.center,
       transform: Matrix4.rotationY(pi),
@@ -459,6 +518,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
   Widget _hearts(int lives) {
     final maxL = _logic.config.startLives;
+
     return Row(
       children: List.generate(maxL, (i) {
         final alive = i < lives;
@@ -621,7 +681,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                   borderRadius: BorderRadius.circular(28),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDCEBD8).withValues(alpha: 0.5),
+                      color: const Color(0xFFDCEBD8).withAlpha(128),
                       border: Border.all(
                         color: const Color(0xFFB8CBB7),
                         width: 2,
@@ -633,7 +693,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 ),
               ),
               ..._itemWidgets(),
-              // Scores under the hearts near each side
               Positioned(
                 left: 20,
                 top: 12 + 28 + 8,
@@ -646,7 +705,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                   ),
                 ),
               ),
-              // Buckets on top of everything
               Positioned(
                 left: p1Bucket.left,
                 top: p1Bucket.top,
