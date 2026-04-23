@@ -35,7 +35,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   static const double _bucketWidth = 200;
   static const double _bucketHeight = 160;
   static const double _bucketAspect = _bucketWidth / _bucketHeight;
-  static const double _arenaSideGapMin = 14;
+  static const double _arenaSideGapMin = 6;
 
   static const String _bgAsset = 'assets/ToiletCompetitive/bg.png';
   static const String _bucketAssetLeft = 'assets/ToiletCompetitive/bucket_left.png';
@@ -184,21 +184,23 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   }
 
   Size _bucketSize(Size screen) {
-    final height = (screen.height * 0.34).clamp(190.0, 320.0).toDouble();
+    final shortestSide = min(screen.width, screen.height);
+    final height = (shortestSide * 0.33).clamp(140.0, 300.0).toDouble();
     final width = height * _bucketAspect;
     return Size(width, height);
   }
 
   double _arenaSideGap(Size screen) {
-    return max(_arenaSideGapMin, screen.width * 0.02);
+    return max(_arenaSideGapMin, screen.width * 0.01);
   }
 
   Rect _playArea(Size size) {
     final bucket = _bucketSize(size);
     final gap = _arenaSideGap(size);
 
-    final left = bucket.width + gap;
-    final right = size.width - bucket.width - gap;
+    final sideInset = bucket.width * 0.88 + gap;
+    final left = sideInset;
+    final right = size.width - sideInset;
     final arenaWidth = max(0.0, right - left);
 
     final arenaHeight = size.height * 0.66;
@@ -215,23 +217,24 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final bucket = _bucketSize(size);
     final height = bucket.height;
     final width = bucket.width;
+    final edgeOverflow = min(18.0, width * 0.10);
 
     final centerY = playArea.center.dy;
     final y = (centerY - height / 2).clamp(0.0, size.height - height);
 
     if (player == 1) {
-      return Rect.fromLTWH(0, y, width, height);
+      return Rect.fromLTWH(-edgeOverflow, y, width, height);
     }
 
-    return Rect.fromLTWH(size.width - width, y, width, height);
+    return Rect.fromLTWH(size.width - width + edgeOverflow, y, width, height);
   }
 
   Rect _bucketCatchRect(Rect bucketRect) {
-    final catchWidth = bucketRect.width * 0.22;
-    final catchHeight = bucketRect.height * 0.14;
+    final catchWidth = bucketRect.width * 0.15;
+    final catchHeight = bucketRect.height * 0.12;
 
     final left = bucketRect.left + (bucketRect.width - catchWidth) / 2;
-    final top = bucketRect.top + bucketRect.height * 0.48;
+    final top = bucketRect.top + bucketRect.height * 0.40;
 
     return Rect.fromLTWH(left, top, catchWidth, catchHeight);
   }
