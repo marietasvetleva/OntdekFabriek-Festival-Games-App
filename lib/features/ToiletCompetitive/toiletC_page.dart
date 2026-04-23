@@ -525,12 +525,14 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
   }
 
-  List<Widget> _itemWidgets() {
+  List<Widget> _itemWidgets({required bool draggedOnly}) {
     final widgets = <Widget>[];
 
     for (final item in _gameState.activeItems) {
       final layout = _layouts[item.id];
       if (layout == null) continue;
+      final isDragged = layout.draggedByPlayer != null;
+      if (draggedOnly != isDragged) continue;
 
       final sz = _itemSizePixels(item);
       final scale = _itemArtScaleForType(item.type);
@@ -683,7 +685,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                   ),
                 ),
               ),
-              ..._itemWidgets(),
+              ..._itemWidgets(draggedOnly: false),
               Positioned(
                 left: 20,
                 top: 12 + 28 + 8,
@@ -732,6 +734,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                   ],
                 ),
               ),
+              ..._itemWidgets(draggedOnly: true),
               Positioned(
                 right: 20,
                 top: 12 + 28 + 8,
