@@ -5,6 +5,11 @@ import 'toiletC_models.dart';
 class ToiletCompetitiveLogic {
   final GameConfig config;
   final Random _rng;
+  final List<CompetitiveItemType> _recentSpawnedTypes = [];
+
+  static const int _recentHistorySize = 3;
+  static const List<double> _recentTypePenalties = [0.07, 0.15, 0.25];
+  static const double _weightFloor = 0.0001;
 
   ToiletCompetitiveLogic({
     this.config = const GameConfig(),
@@ -41,6 +46,7 @@ class ToiletCompetitiveLogic {
     state.activeItems.clear();
     state.nextSpawnCheckAtSec = 0;
     state.idCounter = 0;
+    _recentSpawnedTypes.clear();
 
     for (final player in state.players.values) {
       player.lives = config.startLives;
@@ -87,17 +93,19 @@ class ToiletCompetitiveLogic {
 
     final ttlSec = _ttlAt(checkTimeSec);
 
+    final spawnType = _rollItemType();
     final spawnPoint = _pickSpawnPoint(state);
     state.activeItems.add(
       CompetitiveItemSpawn(
         id: 'i_${state.idCounter++}',
-        type: _rollItemType(),
+        type: spawnType,
         spawnedAtSec: checkTimeSec,
         ttlSec: ttlSec,
         spawnXNorm: spawnPoint.$1,
         spawnYNorm: spawnPoint.$2,
       ),
     );
+    _rememberSpawnedType(spawnType);
   }
 
   (double, double) _pickSpawnPoint(ToiletCompetitiveState state) {
@@ -360,20 +368,69 @@ class ToiletCompetitiveLogic {
         recyclableTotal > 0 ? recyclingShare / recyclableTotal : 0.5;
     final unrecyclableShare = (1.0 - recyclableTotal).clamp(0.0, 1.0);
 
-    final roll = _rng.nextDouble();
+    final organicMass = normalizedOrganic * (1.0 - unrecyclableShare);
+    final recyclingMass = normalizedRecycling * (1.0 - unrecyclableShare);
+    final unrecyclableMass = unrecyclableShare;
 
-    final organicThreshold = normalizedOrganic * (1.0 - unrecyclableShare);
-    final recyclingThreshold =
-        (normalizedOrganic + normalizedRecycling) * (1.0 - unrecyclableShare);
+    final perOrganicWeight = organicMass / organicItems.length;
+    final perRecyclingWeight = recyclingMass / recyclingItems.length;
+    final perUnrecyclableWeight = unrecyclableMass / unrecyclableItems.length;
 
-    if (roll < organicThreshold) {
-      return organicItems[_rng.nextInt(organicItems.length)];
+    final weightedByType = <CompetitiveItemType, double>{};
+    for (final type in organicItems) {
+      weightedByType[type] =
+          max(_weightFloor, perOrganicWeight * _recencyMultiplierFor(type));
+    }
+    for (final type in recyclingItems) {
+      weightedByType[type] =
+          max(_weightFloor, perRecyclingWeight * _recencyMultiplierFor(type));
+    }
+    for (final type in unrecyclableItems) {
+      weightedByType[type] = max(
+        _weightFloor,
+        perUnrecyclableWeight * _recencyMultiplierFor(type),
+      );
     }
 
-    if (roll < recyclingThreshold) {
-      return recyclingItems[_rng.nextInt(recyclingItems.length)];
+    return _pickWeightedType(weightedByType);
+  }
+
+  double _recencyMultiplierFor(CompetitiveItemType type) {
+    final historyCount = min(_recentSpawnedTypes.length, _recentTypePenalties.length);
+    for (var i = 0; i < historyCount; i++) {
+      final recentType = _recentSpawnedTypes[_recentSpawnedTypes.length - 1 - i];
+      if (recentType == type) {
+        return _recentTypePenalties[i];
+      }
+    }
+    return 1.0;
+  }
+
+  CompetitiveItemType _pickWeightedType(
+    Map<CompetitiveItemType, double> weightedByType,
+  ) {
+    var totalWeight = 0.0;
+    for (final weight in weightedByType.values) {
+      totalWeight += weight;
     }
 
-    return unrecyclableItems[_rng.nextInt(unrecyclableItems.length)];
+    final roll = _rng.nextDouble() * totalWeight;
+    var cumulative = 0.0;
+
+    for (final entry in weightedByType.entries) {
+      cumulative += entry.value;
+      if (roll <= cumulative) {
+        return entry.key;
+      }
+    }
+
+    return weightedByType.keys.last;
+  }
+
+  void _rememberSpawnedType(CompetitiveItemType type) {
+    _recentSpawnedTypes.add(type);
+    if (_recentSpawnedTypes.length > _recentHistorySize) {
+      _recentSpawnedTypes.removeAt(0);
+    }
   }
 }
