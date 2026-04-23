@@ -231,7 +231,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final catchHeight = bucketRect.height * 0.14;
 
     final left = bucketRect.left + (bucketRect.width - catchWidth) / 2;
-    final top = bucketRect.top + bucketRect.height * 0.30;
+    final top = bucketRect.top + bucketRect.height * 0.48;
 
     return Rect.fromLTWH(left, top, catchWidth, catchHeight);
   }
@@ -297,15 +297,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         return const Color(0xFFAEDC9B);
       case BinType.recycling:
         return const Color(0xFFFFC16A);
-    }
-  }
-
-  String _binLabelFor(BinType binType) {
-    switch (binType) {
-      case BinType.organic:
-        return 'ORGANIC';
-      case BinType.recycling:
-        return 'RECYCLING';
     }
   }
 
@@ -720,17 +711,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                       alignment: Alignment.bottomCenter,
                       flipX: false,
                     ),
-                    Positioned(
-                      top: 8,
-                      child: Text(
-                        _binLabelFor(p1.binType),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1E2A1F),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -748,17 +728,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                       fit: BoxFit.contain,
                       alignment: Alignment.bottomCenter,
                       flipX: false,
-                    ),
-                    Positioned(
-                      top: 8,
-                      child: Text(
-                        _binLabelFor(p2.binType),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1E2A1F),
-                        ),
-                      ),
                     ),
                   ],
                 ),

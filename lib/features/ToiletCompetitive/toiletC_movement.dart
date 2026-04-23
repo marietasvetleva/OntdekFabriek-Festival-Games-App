@@ -18,7 +18,7 @@ bool isItemCaughtByBucket({
   required Rect itemRect,
   required Rect bucketRect,
   double horizontalPadding = 20,
-  double topMagnetBand = 24,
+  double topMagnetBand = 12,
   double verticalTolerance = 12,
 }) {
   final expandedBucket = Rect.fromLTRB(
