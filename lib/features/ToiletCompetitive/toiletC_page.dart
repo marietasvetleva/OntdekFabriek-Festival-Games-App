@@ -546,6 +546,65 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
   }
 
+  Widget _binTimerPuck({
+    required double progress,
+    required int secsLeft,
+    required double diameter,
+  }) {
+    final danger = progress < 0.25;
+    final ringColor = Color.lerp(
+      const Color(0xFFE46C6C),
+      const Color(0xFF4FAE64),
+      progress,
+    )!;
+    final ringSize = diameter * 0.84;
+    final strokeWidth = (diameter * 0.10).clamp(7.0, 12.0);
+    final fontSize = (diameter * 0.30).clamp(24.0, 38.0);
+
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F3ED),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: danger ? const Color(0xFFA74747) : const Color(0xFF6E7A70),
+          width: 2,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: ringSize,
+            height: ringSize,
+            child: CircularProgressIndicator(
+              value: progress,
+              strokeWidth: strokeWidth,
+              backgroundColor: const Color(0xFFD8DED4),
+              valueColor: AlwaysStoppedAnimation<Color>(ringColor),
+            ),
+          ),
+          Text(
+            '$secsLeft',
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w800,
+              color: danger ? const Color(0xFFA74747) : const Color(0xFF1E2A1F),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Widget> _itemWidgets() {
     final widgets = <Widget>[];
 
@@ -605,7 +664,13 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final p2Bucket = _playerBucketRect(size: size, playArea: playArea, player: 2);
     final p1 = _gameState.players[CompetitivePlayerId.p1]!;
     final p2 = _gameState.players[CompetitivePlayerId.p2]!;
-    final secsLeft = _logic.timeLeftSec(_gameState).ceil().clamp(0, 99999);
+    final timeLeft = _logic.timeLeftSec(_gameState);
+    final secsLeft = timeLeft.ceil().clamp(0, 99999);
+    final timerProgress = (timeLeft / _logic.config.gameDurationSec).clamp(
+      0.0,
+      1.0,
+    );
+    final timerDiameter = (size.shortestSide * 0.12).clamp(96.0, 120.0);
 
     if (_phase == _GamePhase.intro) {
       return Scaffold(
@@ -682,27 +747,14 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 child: _hearts(p2.lives),
               ),
               Positioned(
-                top: 6,
+                top: max(18.0, playArea.top - timerDiameter - 50.0),
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: Container(
-                    width: 180,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCEBD8),
-                      border: Border.all(color: const Color(0xFF6E7A70)),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '${(secsLeft ~/ 60).toString().padLeft(2, '0')}:'
-                      '${(secsLeft % 60).toString().padLeft(2, '0')}',
-                      style: const TextStyle(
-                        fontSize: 40,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F1711),
-                      ),
-                    ),
+                  child: _binTimerPuck(
+                    progress: timerProgress,
+                    secsLeft: secsLeft,
+                    diameter: timerDiameter,
                   ),
                 ),
               ),
