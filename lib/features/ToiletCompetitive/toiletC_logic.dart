@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:flutter/animation.dart';
+
 import 'toiletC_models.dart';
 
 class ToiletCompetitiveLogic {
@@ -84,7 +86,6 @@ class ToiletCompetitiveLogic {
 
   void _runSpawnCheck(ToiletCompetitiveState state, double checkTimeSec) {
     final maxActive = _maxActiveItemsAt(checkTimeSec);
-
     if (state.activeItems.length >= maxActive) return;
 
     final spawnChance = _spawnChanceAt(checkTimeSec);
@@ -153,7 +154,16 @@ class ToiletCompetitiveLogic {
       return config.midMaxActiveItems;
     }
 
-    return config.lateMaxActiveItems;
+    final lateProgress =
+        ((timeSec - halfPoint) / (config.gameDurationSec - halfPoint))
+            .clamp(0.0, 1.0);
+    final ramp = Curves.easeInCubic.transform(lateProgress);
+
+    // Endgame pressure: quickly becomes too crowded to clear.
+    final endgameCap = config.lateMaxActiveItems + 9;
+    return (config.lateMaxActiveItems +
+            ((endgameCap - config.lateMaxActiveItems) * ramp).round())
+        .clamp(config.lateMaxActiveItems, endgameCap);
   }
 
   double _spawnChanceAt(double timeSec) {
@@ -166,7 +176,15 @@ class ToiletCompetitiveLogic {
       return config.midSpawnChance;
     }
 
-    return config.lateSpawnChance;
+    final lateProgress =
+        ((timeSec - halfPoint) / (config.gameDurationSec - halfPoint))
+            .clamp(0.0, 1.0);
+    final ramp = Curves.easeInCubic.transform(lateProgress);
+
+    // Ramp from normal late-game to near-guaranteed spawn checks.
+    const double endgameSpawnChance = 0.995;
+    return config.lateSpawnChance +
+        (endgameSpawnChance - config.lateSpawnChance) * ramp;
   }
 
   double _ttlAt(double timeSec) {
@@ -179,7 +197,16 @@ class ToiletCompetitiveLogic {
       return _randomBetween(config.midTtlSec * 0.9, config.midTtlSec * 1.1);
     }
 
-    return _randomBetween(config.minTtlSec * 0.9, config.minTtlSec * 1.1);
+    final lateProgress =
+        ((timeSec - halfPoint) / (config.gameDurationSec - halfPoint))
+            .clamp(0.0, 1.0);
+    final ramp = Curves.easeInCubic.transform(lateProgress);
+
+    // Keep items around longer in endgame so pressure snowballs.
+    final endgameTtlSec = config.minTtlSec + 1.1;
+    final ttl =
+        config.minTtlSec + (endgameTtlSec - config.minTtlSec) * ramp;
+    return _randomBetween(ttl * 0.9, ttl * 1.1);
   }
 
   double _randomBetween(double min, double max) {
