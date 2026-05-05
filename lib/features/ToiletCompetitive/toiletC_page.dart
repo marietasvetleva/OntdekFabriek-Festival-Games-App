@@ -30,8 +30,10 @@ class ToiletCompetitivePage extends StatefulWidget {
 }
 
 class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
-  static const double _itemMinSize = 25;
-  static const double _itemStartSize = 150;
+  static const double _itemMinSize = 110;
+  static const double _itemStartSize = 135;
+  static const double _spawnPopDurationSec = 0.24;
+  static const double _spawnStartScale = 0.72;
   static const double _bucketWidth = 200;
   static const double _bucketHeight = 160;
   static const double _bucketAspect = _bucketWidth / _bucketHeight;
@@ -45,6 +47,10 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   static const String _gumAsset = 'assets/ToiletCompetitive/items/gum.png';
   static const String _bananaPeelAsset =
       'assets/ToiletCompetitive/items/banana_peel.png';
+  static const String _bananaSlightlyAgedAsset =
+      'assets/ToiletCompetitive/items/slightly_aged_banana.png';
+  static const String _bananaVeryAgedAsset =
+      'assets/ToiletCompetitive/items/very_aged_banana.png';
   static const String _appleCoreAsset =
       'assets/ToiletCompetitive/items/apple_core.png';
   static const String _leafAsset = 'assets/ToiletCompetitive/items/leaf.png';
@@ -281,6 +287,18 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       case CompetitiveItemType.waterBottle:
         return _waterBottleAsset;
     }
+  }
+
+  String _assetForItem(CompetitiveItemSpawn item) {
+    if (item.type != CompetitiveItemType.bananaPeel) {
+      return _assetForType(item.type);
+    }
+
+    // Bananas visibly age in 3 distinct steps across their lifetime.
+    final progress = _logic.itemAgeProgress(_gameState, item);
+    if (progress < 0.34) return _bananaPeelAsset;
+    if (progress < 0.67) return _bananaSlightlyAgedAsset;
+    return _bananaVeryAgedAsset;
   }
 
   Color _bubbleColorForType(CompetitiveItemType type) {
@@ -537,20 +555,39 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
       final sz = _itemSizePixels(item);
       final scale = _itemArtScaleForType(item.type);
+      final activeAge = _logic.itemActiveAgeSec(_gameState, item);
+      final popT = (activeAge / _spawnPopDurationSec).clamp(0.0, 1.0);
+      final popScale =
+          _spawnStartScale +
+          (1.0 - _spawnStartScale) * Curves.easeOutBack.transform(popT);
+      final spawnOpacity = Curves.easeOut.transform(popT);
+      final phase = (item.id.hashCode % 360) * (pi / 180.0);
+      final wobbleX = item.isBeingHeld
+          ? 0.0
+          : sin(_gameState.elapsedSec * 4.4 + phase) * 3.0;
+      final wobbleY = item.isBeingHeld
+          ? 0.0
+          : cos(_gameState.elapsedSec * 3.5 + phase) * 2.0;
 
       widgets.add(
         Positioned(
           left: layout.x,
           top: layout.y,
-          child: Transform.scale(
-            scale: scale,
-            child: _imageOrFallback(
-              path: _assetForType(item.type),
-              width: sz,
-              height: sz,
-              fallbackColor: _bubbleColorForType(item.type),
-              shape: BoxShape.circle,
-              fit: BoxFit.contain,
+          child: Transform.translate(
+            offset: Offset(wobbleX, wobbleY),
+            child: Opacity(
+              opacity: spawnOpacity,
+              child: Transform.scale(
+                scale: scale * popScale,
+                child: _imageOrFallback(
+                  path: _assetForItem(item),
+                  width: sz,
+                  height: sz,
+                  fallbackColor: _bubbleColorForType(item.type),
+                  shape: BoxShape.circle,
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
           ),
         ),

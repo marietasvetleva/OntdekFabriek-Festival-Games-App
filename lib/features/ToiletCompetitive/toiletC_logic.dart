@@ -292,16 +292,23 @@ class ToiletCompetitiveLogic {
     ToiletCompetitiveState state,
     CompetitiveItemSpawn item,
   ) {
+    final age = itemActiveAgeSec(state, item);
+    if (item.ttlSec <= 0) return 1.0;
+
+    return (age / item.ttlSec).clamp(0.0, 1.0);
+  }
+
+  double itemActiveAgeSec(
+    ToiletCompetitiveState state,
+    CompetitiveItemSpawn item,
+  ) {
     var heldSec = item.totalHeldSec;
 
     if (item.isBeingHeld && item.holdStartedAtSec != null) {
       heldSec += state.elapsedSec - item.holdStartedAtSec!;
     }
 
-    final age = state.elapsedSec - item.spawnedAtSec - heldSec;
-    if (item.ttlSec <= 0) return 1.0;
-
-    return (age / item.ttlSec).clamp(0.0, 1.0);
+    return max(0.0, state.elapsedSec - item.spawnedAtSec - heldSec);
   }
 
   double itemDisplaySizePixels({
