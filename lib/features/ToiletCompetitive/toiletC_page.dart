@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui' show lerpDouble;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import 'toiletC_models.dart';
 import 'toiletC_movement.dart';
 
 enum _GamePhase { intro, running, finished }
+enum _DepositFxType { vacuum, reject }
 
 class _ItemLayout {
   _ItemLayout({
@@ -20,6 +22,34 @@ class _ItemLayout {
   double y;
   int? draggedByPlayer;
   double? frozenSize;
+}
+
+class _DepositFx {
+  _DepositFx({
+    required this.id,
+    required this.type,
+    required this.assetPath,
+    required this.fallbackColor,
+    required this.startAtSec,
+    required this.durationSec,
+    required this.startCenter,
+    required this.targetCenter,
+    required this.endCenter,
+    required this.baseSize,
+    required this.artScale,
+  });
+
+  final String id;
+  final _DepositFxType type;
+  final String assetPath;
+  final Color fallbackColor;
+  final double startAtSec;
+  final double durationSec;
+  final Offset startCenter;
+  final Offset targetCenter;
+  final Offset endCenter;
+  final double baseSize;
+  final double artScale;
 }
 
 class ToiletCompetitivePage extends StatefulWidget {
@@ -39,7 +69,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   static const double _bucketAspect = _bucketWidth / _bucketHeight;
   static const double _arenaSideGapMin = 6;
 
-  static const String _bgAsset = 'assets/ToiletCompetitive/bg.png';
   static const String _bucketAssetLeft = 'assets/ToiletCompetitive/bucket_left.png';
   static const String _bucketAssetRight = 'assets/ToiletCompetitive/bucket_right.png';
   static const String _cigaretteAsset =
@@ -74,6 +103,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
   final Map<String, _ItemLayout> _layouts = {};
   final Map<int, int> _pointerOwnerById = {};
+  final List<_DepositFx> _depositFx = [];
+  int _depositFxCounter = 0;
 
   Timer? _frameTimer;
 
@@ -97,6 +128,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     setState(() {
       _phase = _GamePhase.running;
       _layouts.clear();
+      _depositFx.clear();
       _logic.start(_gameState);
     });
 
@@ -108,6 +140,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       setState(() {
         _logic.tick(_gameState, dt);
         _syncLayoutsForActiveItems(_playArea(size));
+        _pruneFinishedDepositFx();
       });
 
       if (_gameState.finished) {
@@ -268,6 +301,48 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
   }
 
+  Offset _rectCenter(Rect rect) {
+    return Offset(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+
+  void _pruneFinishedDepositFx() {
+    if (_depositFx.isEmpty) return;
+    final now = _gameState.elapsedSec;
+    _depositFx.removeWhere((fx) => now - fx.startAtSec >= fx.durationSec);
+  }
+
+  void _spawnDepositFx({
+    required CompetitiveItemSpawn item,
+    required Offset startCenter,
+    required Offset targetCenter,
+    required DepositOutcome outcome,
+  }) {
+    final now = _gameState.elapsedSec;
+    final isCorrect = outcome == DepositOutcome.correct;
+    final direction = (targetCenter - startCenter);
+    final directionNorm = direction.distance <= 0.001
+        ? const Offset(1, 0)
+        : direction / direction.distance;
+    final perpendicular = Offset(-directionNorm.dy, directionNorm.dx);
+    final rejectEnd =
+        targetCenter - (directionNorm * 96) + (perpendicular * 22);
+    _depositFx.add(
+      _DepositFx(
+        id: 'fx_${_depositFxCounter++}',
+        type: isCorrect ? _DepositFxType.vacuum : _DepositFxType.reject,
+        assetPath: _assetForItem(item),
+        fallbackColor: _bubbleColorForType(item.type),
+        startAtSec: now,
+        durationSec: isCorrect ? 0.24 : 0.30,
+        startCenter: startCenter,
+        targetCenter: targetCenter,
+        endCenter: rejectEnd,
+        baseSize: _itemSizePixels(item),
+        artScale: _itemArtScaleForType(item.type),
+      ),
+    );
+  }
+
   String _assetForType(CompetitiveItemType type) {
     switch (type) {
       case CompetitiveItemType.cigaretteBud:
@@ -423,6 +498,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
       final sz = _itemSizePixels(spawn);
       final itemRect = Rect.fromLTWH(layout!.x, layout.y, sz, sz);
+      final itemCenter = _rectCenter(itemRect);
 
       layout.draggedByPlayer = null;
 
@@ -452,9 +528,25 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       switch (outcome) {
         case DepositOutcome.correct:
           _safePlaySfx(_sfxGoodCatch);
+          _spawnDepositFx(
+            item: spawn,
+            startCenter: itemCenter,
+            targetCenter: bucketOwner == 1
+                ? _rectCenter(p1CatchRect)
+                : _rectCenter(p2CatchRect),
+            outcome: outcome,
+          );
           break;
         case DepositOutcome.wrong:
           _safePlaySfx(_sfxBadCatch);
+          _spawnDepositFx(
+            item: spawn,
+            startCenter: itemCenter,
+            targetCenter: bucketOwner == 1
+                ? _rectCenter(p1CatchRect)
+                : _rectCenter(p2CatchRect),
+            outcome: outcome,
+          );
           break;
         case DepositOutcome.ignored:
           break;
@@ -656,6 +748,191 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     return widgets;
   }
 
+  List<Widget> _depositFxWidgets() {
+    if (_depositFx.isEmpty) return const [];
+    final now = _gameState.elapsedSec;
+    final widgets = <Widget>[];
+
+    for (final fx in _depositFx) {
+      final t = ((now - fx.startAtSec) / fx.durationSec).clamp(0.0, 1.0);
+      final isVacuum = fx.type == _DepositFxType.vacuum;
+      late final Offset center;
+      late final double scale;
+      late final double opacity;
+      late final double rotation;
+
+      if (isVacuum) {
+        final move = Curves.easeInCubic.transform(t);
+        center = Offset.lerp(fx.startCenter, fx.targetCenter, move)!;
+        scale = lerpDouble(1.0, 0.18, Curves.easeIn.transform(t))!;
+        opacity = lerpDouble(1.0, 0.0, Curves.easeIn.transform(t))!;
+        rotation = t * pi * 1.6;
+      } else {
+        // Wrong bin: impact + hard deflection away from bin.
+        const hitPoint = 0.46;
+        if (t < hitPoint) {
+          final s = Curves.easeIn.transform((t / hitPoint).clamp(0.0, 1.0));
+          center = Offset.lerp(fx.startCenter, fx.targetCenter, s)!;
+          scale = 1.0;
+          opacity = 1.0;
+          rotation = 0.0;
+        } else {
+          final phase = ((t - hitPoint) / (1.0 - hitPoint)).clamp(0.0, 1.0);
+          final s = Curves.easeOutCubic.transform(phase);
+          center = Offset.lerp(fx.targetCenter, fx.endCenter, s)!;
+          scale = lerpDouble(1.0, 0.76, Curves.easeOut.transform(phase))!;
+          opacity = lerpDouble(1.0, 0.0, Curves.easeOut.transform(phase))!;
+          rotation = lerpDouble(0.0, -pi * 0.22, Curves.easeOut.transform(phase))!;
+        }
+      }
+
+      final fxSize = fx.baseSize * fx.artScale * scale;
+      widgets.add(
+        Positioned(
+          left: center.dx - fxSize / 2,
+          top: center.dy - fxSize / 2,
+          child: Opacity(
+            opacity: opacity.clamp(0.0, 1.0),
+            child: Transform.rotate(
+              angle: rotation,
+              child: _imageOrFallback(
+                path: fx.assetPath,
+                width: fxSize,
+                height: fxSize,
+                fallbackColor: fx.fallbackColor,
+                shape: BoxShape.circle,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      if (isVacuum) {
+        final ringScale = 0.75 + t * 0.95;
+        final ringAlpha = (1 - t) * 0.95;
+        widgets.add(
+          Positioned(
+            left: fx.targetCenter.dx - 28 * ringScale,
+            top: fx.targetCenter.dy - 28 * ringScale,
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: ringAlpha.clamp(0.0, 1.0),
+                child: Container(
+                  width: 56 * ringScale,
+                  height: 56 * ringScale,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 4,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0xAA66CC7A),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        widgets.add(
+          Positioned(
+            left: fx.targetCenter.dx - 20 * ringScale,
+            top: fx.targetCenter.dy - 20 * ringScale,
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: (ringAlpha * 0.9).clamp(0.0, 1.0),
+                child: Container(
+                  width: 40 * ringScale,
+                  height: 40 * ringScale,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF42C763),
+                      width: 3.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      } else if (t > 0.30 && t < 0.88) {
+        final phase = ((t - 0.30) / 0.58).clamp(0.0, 1.0);
+        final ringScale = 0.75 + phase * 0.95;
+        final ringAlpha = ((1.0 - phase) * 0.95).clamp(0.0, 1.0);
+        widgets.add(
+          Positioned(
+            left: fx.targetCenter.dx - 28 * ringScale,
+            top: fx.targetCenter.dy - 28 * ringScale,
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: ringAlpha,
+                child: Container(
+                  width: 56 * ringScale,
+                  height: 56 * ringScale,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 4,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0xAAC14848),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        widgets.add(
+          Positioned(
+            left: fx.targetCenter.dx - 20 * ringScale,
+            top: fx.targetCenter.dy - 20 * ringScale,
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: (ringAlpha * 0.9).clamp(0.0, 1.0),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 40 * ringScale,
+                      height: 40 * ringScale,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFC14848),
+                          width: 3.5,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.close_rounded,
+                      size: 18 * ringScale,
+                      color: const Color(0xFFC14848),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    return widgets;
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -729,11 +1006,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           child: Stack(
             children: [
               Positioned.fill(
-                child: _imageOrFallback(
-                  path: _bgAsset,
-                  width: size.width,
-                  height: size.height,
-                  fallbackColor: const Color(0xFFF1F0EA),
+                child: Container(
+                  color: const Color(0xFFF1F0EA),
                 ),
               ),
               Positioned(
@@ -824,6 +1098,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 ),
               ),
               ..._itemWidgets(),
+              ..._depositFxWidgets(),
               Positioned(
                 right: 20,
                 top: 12 + 28 + 8,
