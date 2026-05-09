@@ -1,0 +1,25 @@
+name: flutter_game
+description: Stage Setup Challenge
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_fonts: ^6.1.0 # <-- ADAUGA AICI
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/stage.png
+    - assets/firstcharacter.png
+    - assets/secondcharacter.png
+    - assets/frame.png
