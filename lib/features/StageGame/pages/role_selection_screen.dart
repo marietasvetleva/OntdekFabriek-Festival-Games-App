@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../final_screen.dart';
+import 'stage_game_page.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -42,18 +42,24 @@ class RoleSelectionScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: const [
-                      Text('IMPACT MAKERS',
-                          style: TextStyle(
-                              fontSize: 9,
-                              fontFamily: 'Courier',
-                              color: Colors.grey,
-                              letterSpacing: 1.5)),
-                      Text('ANNUALLY ETC',
-                          style: TextStyle(
-                              fontSize: 9,
-                              fontFamily: 'Courier',
-                              color: Colors.grey,
-                              letterSpacing: 1.5)),
+                      Text(
+                        'IMPACT MAKERS',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontFamily: 'Courier',
+                          color: Colors.grey,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      Text(
+                        'ANNUALLY ETC',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontFamily: 'Courier',
+                          color: Colors.grey,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
                     ],
                   ),
 
@@ -66,7 +72,9 @@ class RoleSelectionScreen extends StatelessWidget {
                         color: const Color(0xFFD6EDE0),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: const Color(0xFF9DC4A8), width: 1.5),
+                          color: const Color(0xFF9DC4A8),
+                          width: 1.5,
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -81,7 +89,8 @@ class RoleSelectionScreen extends StatelessWidget {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                      builder: (_) => const FinalScreen()),
+                                    builder: (_) => const StageGamePage(),
+                                  ),
                                 );
                               },
                             ),
@@ -100,7 +109,14 @@ class RoleSelectionScreen extends StatelessWidget {
                               description:
                                   'Control the technical performance of the stage. Adjust power load, sound levels, and lighting to keep everything running smoothly and avoid overload.',
                               imagePath: 'assets/secondcharacter.png',
-                              onStart: () {},
+                              onStart: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const StageGamePage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -141,7 +157,10 @@ class _RoleCard extends StatelessWidget {
           Expanded(
             flex: 5,
             child: Center(
-              child: Image.asset(imagePath, fit: BoxFit.contain),
+              child: Image.asset(
+                imagePath,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
 
@@ -157,7 +176,10 @@ class _RoleCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFFD6EDE0), // verde
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF9DC4A8), width: 1),
+                border: Border.all(
+                  color: const Color(0xFF9DC4A8),
+                  width: 1,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,6 +213,7 @@ class _RoleCard extends StatelessWidget {
               ),
             ),
           ),
+
           // BUTON
           Center(
             child: GestureDetector(

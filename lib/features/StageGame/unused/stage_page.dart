@@ -1,11 +1,11 @@
-import 'dart:math';
+/*import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'stage_audio_controller.dart';
-import 'services/led_service.dart';
-import 'scores_page.dart';
+import '../../../screens/stage_audio_controller.dart';
+import '../../../screens/services/led_service.dart';
+import '../../../screens/scores_page.dart';
 
 // GLOBAL AUDIO ENGINE (Audioplayers 5.x)
 
@@ -1863,3 +1863,4 @@ class _LightConeClipper extends CustomClipper<Path> {
   @override
   bool shouldReclip(_) => false;
 }
+*/

@@ -1,9 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'screens/splash_screen.dart';
+import 'splash_screen.dart';
 
 class FinalScreen extends StatelessWidget {
-  const FinalScreen({super.key});
+  final int sustainabilityScore;
+  final int stabilityScore;
+  final int audienceScore;
+  final String crowdReaction;
+  final String endComment;
+
+  const FinalScreen({
+    super.key,
+    required this.sustainabilityScore,
+    required this.stabilityScore,
+    required this.audienceScore,
+    required this.crowdReaction,
+    required this.endComment,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +44,7 @@ class FinalScreen extends StatelessWidget {
               ),
             ),
 
-            // STAGE IN SPATE - mai transparent
+            // STAGE BACKGROUND
             Positioned.fill(
               child: Opacity(
                 opacity: 0.15,
@@ -42,60 +55,80 @@ class FinalScreen extends StatelessWidget {
               ),
             ),
 
-            // CONTINUT
+            // CONTENT
             Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: size.width * 0.08),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // PATRAT CU SCORURI
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(
-                          vertical: 30, horizontal: 24),
+                        vertical: 30,
+                        horizontal: 24,
+                      ),
                       decoration: BoxDecoration(
-                        color: Color.fromRGBO(234, 234, 224, 0.9),
+                        color: const Color.fromRGBO(234, 234, 224, 0.9),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Column(
                         children: [
-                          // YOUR SCORE
-                          // YOUR SCORE - titlu mare
                           Text(
-                            'Your Score',
+                            crowdReaction,
                             style: GoogleFonts.caveat(
-                              fontSize: 48, // era 32
+                              fontSize: 52,
                               fontWeight: FontWeight.w900,
                               color: Colors.black,
                             ),
                           ),
 
-                          const SizedBox(height: 20),
-
-                          // SUSTAINABILITY
-                          _ScoreRow(label: 'Sustainability Score:'),
                           const SizedBox(height: 12),
 
-                          // STABILITY
-                          _ScoreRow(label: 'Stability Score:'),
+                          Text(
+                            endComment,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.caveat(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          _ScoreRow(
+                            label: 'Sustainability Score',
+                            value: sustainabilityScore,
+                          ),
+
                           const SizedBox(height: 12),
 
-                          // AUDIENCE
-                          _ScoreRow(label: 'Audience Satisfaction:'),
+                          _ScoreRow(
+                            label: 'Stability Score',
+                            value: stabilityScore,
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          _ScoreRow(
+                            label: 'Audience Satisfaction',
+                            value: audienceScore,
+                          ),
                         ],
                       ),
                     ),
 
                     const SizedBox(height: 30),
 
-                    // BUTON PLAY AGAIN
+                    // PLAY AGAIN BUTTON
                     GestureDetector(
                       onTap: () {
                         Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const SplashScreen()),
+                            builder: (_) => const SplashScreen(),
+                          ),
                           (route) => false,
                         );
                       },
@@ -138,8 +171,12 @@ class FinalScreen extends StatelessWidget {
 
 class _ScoreRow extends StatelessWidget {
   final String label;
+  final int value;
 
-  const _ScoreRow({required this.label});
+  const _ScoreRow({
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -150,13 +187,26 @@ class _ScoreRow extends StatelessWidget {
         color: const Color(0xFF9DC4A8),
         borderRadius: BorderRadius.circular(30),
       ),
-      child: Text(
-        label,
-        style: GoogleFonts.caveat(
-          fontSize: 30, // era 20, mai mare
-          fontWeight: FontWeight.w800, // era w700, mai gros
-          color: Colors.black,
-        ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.caveat(
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+              color: Colors.black,
+            ),
+          ),
+          Text(
+            value.toString(),
+            style: GoogleFonts.caveat(
+              fontSize: 30,
+              fontWeight: FontWeight.w900,
+              color: Colors.black,
+            ),
+          ),
+        ],
       ),
     );
   }
