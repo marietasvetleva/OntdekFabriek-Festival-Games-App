@@ -309,7 +309,7 @@ Widget _buildStageVisualArea() {
     fit: StackFit.expand,
     children: [
       Image.asset(
-        'assets/Stage_top_view_202604140932-removebg-preview 1.png',
+        'assets/StageGameV2-image/Stage_top_view.png',
         fit: BoxFit.contain,
       ),
 

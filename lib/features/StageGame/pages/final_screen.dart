@@ -38,7 +38,7 @@ class FinalScreen extends StatelessWidget {
               bottom: -55,
               child: IgnorePointer(
                 child: Image.asset(
-                  'assets/frame.png',
+                  'assets/StageGameV2-image/frame.png',
                   fit: BoxFit.fill,
                 ),
               ),

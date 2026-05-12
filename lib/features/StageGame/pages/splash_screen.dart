@@ -25,7 +25,7 @@ class SplashScreen extends StatelessWidget {
               bottom: -55,
               child: IgnorePointer(
                 child: Image.asset(
-                  'assets/frame.png',
+                  'assets/StageGameV2-image/frame.png',
                   fit: BoxFit.fill,
                 ),
               ),
@@ -34,7 +34,7 @@ class SplashScreen extends StatelessWidget {
             // SCENA - foarte mare, ocupa aproape tot
             Positioned.fill(
               child: Image.asset(
-                'assets/stage.png',
+                'assets/StageGameV2-image/stage.png',
                 fit: BoxFit.contain,
               ),
             ),

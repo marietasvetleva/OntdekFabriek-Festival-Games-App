@@ -8,6 +8,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await StageAudioController.instance.initialize();
+
   final prefs = await SharedPreferences.getInstance();
   await prefs.clear();
 

@@ -25,7 +25,7 @@ class RoleSelectionScreen extends StatelessWidget {
               bottom: -55,
               child: IgnorePointer(
                 child: Image.asset(
-                  'assets/frame.png',
+                  'assets/StageGameV2-image/frame.png',
                   fit: BoxFit.fill,
                 ),
               ),
@@ -84,7 +84,7 @@ class RoleSelectionScreen extends StatelessWidget {
                               title: 'Personal Assistant',
                               description:
                                   'Choose the equipment and setup strategy for the stage.\nPick power sources, sound systems, lighting and effects while balancing performance and sustainability.',
-                              imagePath: 'assets/firstcharacter.png',
+                              imagePath: 'assets/StageGameV2-image/firstcharacter.png',
                               onStart: () {
                                 Navigator.push(
                                   context,
@@ -108,7 +108,7 @@ class RoleSelectionScreen extends StatelessWidget {
                               title: 'Stage Builder',
                               description:
                                   'Control the technical performance of the stage. Adjust power load, sound levels, and lighting to keep everything running smoothly and avoid overload.',
-                              imagePath: 'assets/secondcharacter.png',
+                              imagePath: 'assets/StageGameV2-image/secondcharacter.png',
                               onStart: () {
                                 Navigator.push(
                                   context,

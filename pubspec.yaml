@@ -44,6 +44,7 @@ dependencies:
   audio_session: ^0.1.18
   fftea: ^1.5.0
   video_player: ^2.8.2
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:
@@ -82,7 +83,11 @@ flutter:
     - assets/sounds/
 
     # Stage images
-    - assets/stage/
+    - assets/StageGameV2-image/stage.png
+    - assets/StageGameV2-image/firstcharacter.png
+    - assets/StageGameV2-image/secondcharacter.png
+    - assets/StageGameV2-image/frame.png
+    - assets/StageGameV2-image/Stage_top_view.png
 
     # festival cleaner images
     - assets/trashGame/
