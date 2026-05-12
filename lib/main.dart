@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'features/StageGame/pages/splash_screen.dart';
+import 'features2/StageGame/pages/splash_screen.dart';
 
 void main() {
   runApp(const StageSetupApp());
