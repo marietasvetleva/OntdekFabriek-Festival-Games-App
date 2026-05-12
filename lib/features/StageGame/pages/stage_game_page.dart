@@ -207,6 +207,7 @@ class _StageGamePageState extends State<StageGamePage> {
     );
   }
 
+
   Widget _buildLiveFeedbackPanel() {
     return Card(
       shape: RoundedRectangleBorder(
@@ -277,101 +278,308 @@ class _StageGamePageState extends State<StageGamePage> {
     );
   }
 
-  Widget _buildRunningScreen() {
-    return SingleChildScrollView(
+Widget _buildStageVisualArea() {
+  final isOverloaded =
+      _state.currentPowerCapacity > 0 && _state.totalPowerLoad > _state.currentPowerCapacity;
+
+  Color lightColor = Colors.grey;
+
+  if (_state.selectedLight == LightOption.led) {
+    lightColor = Colors.blueAccent;
+  } else if (_state.selectedLight == LightOption.smart) {
+    lightColor = Colors.purpleAccent;
+  } else if (_state.selectedLight == LightOption.halogen) {
+    lightColor = Colors.orangeAccent;
+  }
+
+  return Card(
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(24),
+    ),
+    child: Container(
+      height: 420,
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1000),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth > 760;
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          ClipRRect(
+  borderRadius: BorderRadius.circular(20),
+  child: Stack(
+    fit: StackFit.expand,
+    children: [
+      Image.asset(
+        'assets/Stage_top_view_202604140932-removebg-preview 1.png',
+        fit: BoxFit.contain,
+      ),
 
-              if (isWide) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        children: [
-                          _buildOptionCard(
-                            title: 'Sound',
-                            child: _buildSoundOptions(),
-                          ),
-                          _buildOptionCard(
-                            title: 'Lighting',
-                            child: _buildLightOptions(),
-                          ),
-                          _buildOptionCard(
-                            title: 'Power Source',
-                            child: _buildPowerOptions(),
-                          ),
-                          _buildOptionCard(
-                            title: 'Effects',
-                            child: _buildEffectOptions(),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          _buildLiveFeedbackPanel(),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _logic.canFinish(_state)
-                                  ? _finishRound
-                                  : null,
-                              child: const Text('Finish Round'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              }
+      Container(
+        color: lightColor.withOpacity(0.25),
+      ),
+    ],
+  ),
+),
+          Positioned(
+            top: 25,
+            left: 40,
+            child: Icon(Icons.lightbulb, color: lightColor, size: 45),
+          ),
+          Positioned(
+            top: 25,
+            right: 40,
+            child: Icon(Icons.lightbulb, color: lightColor, size: 45),
+          ),
 
-              return Column(
+          // if (_state.selectedLight != null)
+          //   Positioned(
+          //     top: 75,
+          //     child: Text(
+          //       '${_lightOptionLabel(_state.selectedLight!)} Lighting',
+          //       style: const TextStyle(
+          //         color: Colors.white,
+          //         fontSize: 18,
+          //         fontWeight: FontWeight.bold,
+          //       ),
+          //     ),
+          //   ), 
+
+          // Positioned(
+          //   bottom: 80,
+          //   child: Container(
+          //     width: 260,
+          //     height: 95,
+          //     decoration: BoxDecoration(
+          //       color: Colors.grey.shade900,
+          //       borderRadius: BorderRadius.circular(16),
+          //       border: Border.all(color: Colors.white24, width: 2),
+          //     ),
+          //     child: const Center(
+          //       child: Text(
+          //         'CENTER STAGE',
+          //         style: TextStyle(
+          //           color: Colors.white,
+          //           fontSize: 22,
+          //           fontWeight: FontWeight.bold,
+          //           letterSpacing: 2,
+          //         ),
+          //       ),
+          //     ),
+          //   ),
+          // ),
+
+          // Positioned(
+          //   bottom: 45,
+          //   child: Container(
+          //     width: 330,
+          //     height: 25,
+          //     decoration: BoxDecoration(
+          //       color: Colors.black,
+          //       borderRadius: BorderRadius.circular(8),
+          //     ),
+          //   ),
+          // ),
+
+          if (_state.selectedEffect == EffectOption.laser) ...[
+            Positioned(
+              top: 130,
+              left: 45,
+              child: Transform.rotate(
+                angle: -0.6,
+                child: Container(
+                  width: 220,
+                  height: 5,
+                  color: Colors.greenAccent,
+                ),
+              ),
+            ),
+            Positioned(
+              top: 130,
+              right: 45,
+              child: Transform.rotate(
+                angle: 0.6,
+                child: Container(
+                  width: 220,
+                  height: 5,
+                  color: Colors.greenAccent,
+                ),
+              ),
+            ),
+          ],
+
+          if (_state.selectedEffect == EffectOption.drone) ...[
+            const Positioned(
+              top: 120,
+              left: 80,
+              child: Icon(Icons.airplanemode_active, color: Colors.white, size: 34),
+            ),
+            const Positioned(
+              top: 105,
+              right: 90,
+              child: Icon(Icons.airplanemode_active, color: Colors.white, size: 34),
+            ),
+          ],
+
+          if (_state.selectedEffect == EffectOption.fireworks) ...[
+            const Positioned(
+              top: 115,
+              left: 75,
+              child: Text('🎆', style: TextStyle(fontSize: 45)),
+            ),
+            const Positioned(
+              top: 95,
+              right: 85,
+              child: Text('🎇', style: TextStyle(fontSize: 45)),
+            ),
+          ],
+
+          // if (_state.selectedEffect != null)
+          //   Positioned(
+          //     bottom: 15,
+          //     child: Text(
+          //       'Effect: ${_effectOptionLabel(_state.selectedEffect!)}',
+          //       style: const TextStyle(
+          //         color: Colors.white70,
+          //         fontSize: 16,
+          //         fontWeight: FontWeight.w600,
+          //       ),
+          //     ),
+          //   ),
+
+          if (isOverloaded)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.55),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Center(
+                child: Text(
+                  '⚠ POWER OVERLOAD ⚠',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+
+ Widget _buildRunningScreen() {
+  return SingleChildScrollView(
+    padding: const EdgeInsets.all(16),
+    child: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1200),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 760;
+
+            if (isWide) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildOptionCard(
-                    title: 'Sound',
-                    child: _buildSoundOptions(),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _buildOptionCard(
+                          title: 'Sound',
+                          child: _buildSoundOptions(),
+                        ),
+                        _buildOptionCard(
+                          title: 'Lighting',
+                          child: _buildLightOptions(),
+                        ),
+                        _buildOptionCard(
+                          title: 'Power Source',
+                          child: _buildPowerOptions(),
+                        ),
+                        _buildOptionCard(
+                          title: 'Effects',
+                          child: _buildEffectOptions(),
+                        ),
+                      ],
+                    ),
                   ),
-                  _buildOptionCard(
-                    title: 'Lighting',
-                    child: _buildLightOptions(),
+
+                  const SizedBox(width: 16),
+
+                  Expanded(
+                    flex: 2,
+                    child: _buildStageVisualArea(),
                   ),
-                  _buildOptionCard(
-                    title: 'Power Source',
-                    child: _buildPowerOptions(),
-                  ),
-                  _buildOptionCard(
-                    title: 'Effects',
-                    child: _buildEffectOptions(),
-                  ),
-                  _buildLiveFeedbackPanel(),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _logic.canFinish(_state)
-                          ? _finishRound
-                          : null,
-                      child: const Text('Finish Round'),
+
+                  const SizedBox(width: 16),
+
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _buildLiveFeedbackPanel(),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _logic.canFinish(_state)
+                                ? _finishRound
+                                : null,
+                            child: const Text('Finish Round'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               );
-            },
-          ),
+            }
+
+            return Column(
+              children: [
+                _buildOptionCard(
+                  title: 'Sound',
+                  child: _buildSoundOptions(),
+                ),
+                _buildOptionCard(
+                  title: 'Lighting',
+                  child: _buildLightOptions(),
+                ),
+                _buildOptionCard(
+                  title: 'Power Source',
+                  child: _buildPowerOptions(),
+                ),
+                _buildOptionCard(
+                  title: 'Effects',
+                  child: _buildEffectOptions(),
+                ),
+
+                const SizedBox(height: 16),
+
+                _buildStageVisualArea(),
+
+                const SizedBox(height: 16),
+
+                _buildLiveFeedbackPanel(),
+
+                const SizedBox(height: 16),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed:
+                        _logic.canFinish(_state) ? _finishRound : null,
+                    child: const Text('Finish Round'),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
