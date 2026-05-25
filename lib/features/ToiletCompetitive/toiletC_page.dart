@@ -9,8 +9,9 @@ import 'toiletC_logic.dart';
 import 'toiletC_models.dart';
 import 'toiletC_movement.dart';
 
-enum _GamePhase { intro, running, finished }
+enum _GamePhase { intro, running, results }
 enum _DepositFxType { vacuum, reject }
+enum _PlayerRoundResult { win, lose, draw }
 
 class _ItemLayout {
   _ItemLayout({
@@ -459,63 +460,294 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   }
 
   void _finishGame() {
-    if (_phase == _GamePhase.finished) return;
-    _phase = _GamePhase.finished;
+    if (_phase == _GamePhase.results) return;
     _frameTimer?.cancel();
     _safePlaySfx(_sfxRoundEnd);
-    _showResultDialog();
+    setState(() => _phase = _GamePhase.results);
   }
 
-  Future<void> _showResultDialog() async {
-    if (!mounted) return;
+  _PlayerRoundResult _roundResultFor(CompetitivePlayerId playerId) {
+    final winner = _logic.winner(_gameState);
+    if (winner == null) return _PlayerRoundResult.draw;
+    return winner == playerId
+        ? _PlayerRoundResult.win
+        : _PlayerRoundResult.lose;
+  }
 
-    final winnerText = _winnerText();
+  void _returnToIntroLobby() {
+    _countdownTimer?.cancel();
+    setState(() {
+      _phase = _GamePhase.intro;
+      _p1Ready = false;
+      _p2Ready = false;
+      _countdown = null;
+      _layouts.clear();
+      _depositFx.clear();
+      _gameState = _logic.createInitialState();
+    });
+  }
+
+  Widget _buildResultsScreen() {
     final p1 = _gameState.players[CompetitivePlayerId.p1]!;
     final p2 = _gameState.players[CompetitivePlayerId.p2]!;
 
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (c) {
-        return AlertDialog(
-          title: const Text('Round klaar!'),
-          content: Text(
-            '$winnerText\n\nSpeler 1: ${p1.score}\nSpeler 2: ${p2.score}',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(c).pop();
-                if (mounted) {
-                  _countdownTimer?.cancel();
-                  setState(() {
-                    _phase = _GamePhase.intro;
-                    _p1Ready = false;
-                    _p2Ready = false;
-                    _countdown = null;
-                  });
-                }
-              },
-              child: const Text('Opnieuw'),
+    // Full width (same as intro) — rotated sides need half-screen width as
+    // their layout height; a narrow card causes bottom overflow.
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F4F1),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              color: const Color(0xFF2D3A2E),
+              child: const Text(
+                'Round complete',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFFF4F4F1),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _resultPlayerSide(
+                      color: const Color(0xFFAEDC9B),
+                      bgGradient: const [
+                        Color(0xFFE8F5E3),
+                        Color(0xFFC8E6C0),
+                      ],
+                      quarterTurns: 1,
+                      result: _roundResultFor(CompetitivePlayerId.p1),
+                      player: p1,
+                      opponent: p2,
+                      onPlayAgain: _returnToIntroLobby,
+                    ),
+                  ),
+                  Container(width: 2, color: const Color(0xFFB8C5B0)),
+                  Expanded(
+                    child: _resultPlayerSide(
+                      color: const Color(0xFFFFC16A),
+                      bgGradient: const [
+                        Color(0xFFFFF3E0),
+                        Color(0xFFFFE0B2),
+                      ],
+                      quarterTurns: 3,
+                      result: _roundResultFor(CompetitivePlayerId.p2),
+                      player: p2,
+                      opponent: p1,
+                      onPlayAgain: _returnToIntroLobby,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 
-  String _winnerText() {
-    final p1 = _gameState.players[CompetitivePlayerId.p1]!;
-    final p2 = _gameState.players[CompetitivePlayerId.p2]!;
+  Widget _resultPlayerSide({
+    required Color color,
+    required List<Color> bgGradient,
+    required int quarterTurns,
+    required _PlayerRoundResult result,
+    required CompetitivePlayerState player,
+    required CompetitivePlayerState opponent,
+    required VoidCallback onPlayAgain,
+  }) {
+    final headline = switch (result) {
+      _PlayerRoundResult.win => 'YOU WIN!',
+      _PlayerRoundResult.lose => 'YOU LOSE',
+      _PlayerRoundResult.draw => "IT'S A DRAW",
+    };
 
-    if (p1.lives <= 0 && p2.lives > 0) return 'Speler 2 wint!';
-    if (p2.lives <= 0 && p1.lives > 0) return 'Speler 1 wint!';
+    final subtitle = switch (result) {
+      _PlayerRoundResult.win => 'You sorted better this round.',
+      _PlayerRoundResult.lose => 'Your opponent took this round.',
+      _PlayerRoundResult.draw => 'Same score — nobody edged ahead.',
+    };
 
-    final w = _logic.winner(_gameState);
-    if (w == CompetitivePlayerId.p1) return 'Speler 1 wint!';
-    if (w == CompetitivePlayerId.p2) return 'Speler 2 wint!';
+    final headlineColor = switch (result) {
+      _PlayerRoundResult.win => const Color(0xFF2A6B32),
+      _PlayerRoundResult.lose => const Color(0xFF8A4A4A),
+      _PlayerRoundResult.draw => const Color(0xFF4A5A6B),
+    };
 
-    return 'Gelijkspel!';
+    final badgeIcon = switch (result) {
+      _PlayerRoundResult.win => Icons.emoji_events_rounded,
+      _PlayerRoundResult.lose => Icons.sentiment_dissatisfied_rounded,
+      _PlayerRoundResult.draw => Icons.handshake_rounded,
+    };
+
+    final badgeBg = switch (result) {
+      _PlayerRoundResult.win => const Color(0xFF3A8B44),
+      _PlayerRoundResult.lose => const Color(0xFF9A6A6A),
+      _PlayerRoundResult.draw => const Color(0xFF6A7A88),
+    };
+
+    Widget statTile(String label, String value) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF5A5A5A),
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF1E2A1F),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: badgeBg,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: badgeBg.withValues(alpha: 0.4),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(badgeIcon, color: Colors.white, size: 28),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          headline,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.w900,
+            color: headlineColor,
+            height: 1.05,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 12,
+            height: 1.35,
+            color: Color(0xFF4A4A4A),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: 280,
+          constraints: const BoxConstraints(maxWidth: 320),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.82),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.55), width: 1.5),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: statTile('Your score', '${player.score}')),
+                  Expanded(
+                    child: statTile('Sorted right', '${player.correct}'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: statTile('Mistakes', '${player.wrong}')),
+                  Expanded(
+                    child: statTile('Passes left', '${player.lives}'),
+                  ),
+                ],
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Divider(height: 1, color: Color(0xFFD0D8D0)),
+              ),
+              statTile('Opponent score', '${opponent.score}'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: 280,
+          child: FilledButton(
+            onPressed: onPlayAgain,
+            style: FilledButton.styleFrom(
+              backgroundColor: color,
+              foregroundColor: const Color(0xFF1E2A1F),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            child: const Text(
+              'Play again',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: bgGradient,
+        ),
+      ),
+      child: RotatedBox(
+        quarterTurns: quarterTurns,
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: content,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Size _bucketSize(Size screen) {
@@ -955,7 +1187,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
   Widget _introPlayerSide({
     required String playerLabel,
-    required String roleLabel,
     required String binLabel,
     required String instruction,
     required Color color,
@@ -1026,19 +1257,19 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
             color: Color(0xFF1E2A1F),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Text(
-          roleLabel,
+          '$binLabel bin',
           style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
             color: color.computeLuminance() > 0.5
                 ? const Color(0xFF3A5A30)
                 : const Color(0xFF6B4400),
-            letterSpacing: 0.8,
+            letterSpacing: 0.4,
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(maxLives, (i) {
@@ -1513,6 +1744,10 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
     final timerDiameter = (size.shortestSide * 0.12).clamp(96.0, 120.0);
 
+    if (_phase == _GamePhase.results) {
+      return _buildResultsScreen();
+    }
+
     if (_phase == _GamePhase.intro) {
       return Scaffold(
         backgroundColor: const Color(0xFFF4F4F1),
@@ -1522,7 +1757,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
               Expanded(
                 child: _introPlayerSide(
                   playerLabel: 'Player 1',
-                  roleLabel: 'Stage Builder',
                   binLabel: 'Organic',
                   instruction:
                       'Drag waste to your bin (Organic).\n'
@@ -1546,7 +1780,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
               Expanded(
                 child: _introPlayerSide(
                   playerLabel: 'Player 2',
-                  roleLabel: 'Personal Assistant',
                   binLabel: 'Plastic',
                   instruction:
                       'Drag waste to your bin (Plastic).\n'
