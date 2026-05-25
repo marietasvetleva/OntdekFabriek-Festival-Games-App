@@ -92,7 +92,6 @@ flutter:
     - assets/trashGame/BackgroundFlow/
     - assets/trashGame/audio/
     - assets/trashGame/Intro and Outro/
-    - assets/trashGame/people/
     - assets/trashGame/Cleaner/
 
     # Food game truck images

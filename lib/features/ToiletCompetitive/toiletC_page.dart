@@ -52,6 +52,286 @@ class _DepositFx {
   final double artScale;
 }
 
+class _FestivalTicketPainter extends CustomPainter {
+  _FestivalTicketPainter({
+    required this.baseColor,
+    this.goldStripe = true,
+    this.crackProgress = 0.0,
+  });
+
+  final Color baseColor;
+  final bool goldStripe;
+  final double crackProgress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final r = w * 0.14;
+    final notchR = w * 0.09;
+
+    final body = Path()
+      ..moveTo(r, 0)
+      ..lineTo(w - r, 0)
+      ..arcToPoint(Offset(w, r), radius: Radius.circular(r))
+      ..lineTo(w, h * 0.38 - notchR)
+      ..arcToPoint(Offset(w, h * 0.38 + notchR),
+          radius: Radius.circular(notchR), clockwise: false)
+      ..lineTo(w, h - r)
+      ..arcToPoint(Offset(w - r, h), radius: Radius.circular(r))
+      ..lineTo(r, h)
+      ..arcToPoint(Offset(0, h - r), radius: Radius.circular(r))
+      ..lineTo(0, h * 0.38 + notchR)
+      ..arcToPoint(Offset(0, h * 0.38 - notchR),
+          radius: Radius.circular(notchR), clockwise: false)
+      ..lineTo(0, r)
+      ..arcToPoint(Offset(r, 0), radius: Radius.circular(r))
+      ..close();
+
+    canvas.drawPath(body, Paint()..color = baseColor);
+
+    canvas.drawPath(
+      body,
+      Paint()
+        ..color = baseColor.computeLuminance() > 0.5
+            ? Colors.black26
+            : Colors.white24
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
+
+    if (goldStripe) {
+      canvas.save();
+      canvas.clipPath(body);
+      final stripeY = h * 0.34;
+      final stripeH = h * 0.20;
+      canvas.drawRect(
+        Rect.fromLTWH(0, stripeY, w, stripeH),
+        Paint()..color = const Color(0xFFD4A537),
+      );
+      _drawStar(canvas, Offset(w / 2, stripeY + stripeH / 2), stripeH * 0.38);
+      canvas.restore();
+    }
+
+    if (crackProgress > 0) {
+      _drawCrack(canvas, size);
+    }
+  }
+
+  void _drawStar(Canvas canvas, Offset c, double r) {
+    final path = Path();
+    for (int i = 0; i < 5; i++) {
+      final oA = -pi / 2 + i * 2 * pi / 5;
+      final iA = oA + pi / 5;
+      final op = Offset(c.dx + r * cos(oA), c.dy + r * sin(oA));
+      final ip = Offset(c.dx + r * 0.4 * cos(iA), c.dy + r * 0.4 * sin(iA));
+      if (i == 0) {
+        path.moveTo(op.dx, op.dy);
+      } else {
+        path.lineTo(op.dx, op.dy);
+      }
+      path.lineTo(ip.dx, ip.dy);
+    }
+    path.close();
+    canvas.drawPath(path, Paint()..color = const Color(0xFFFFF8DC));
+  }
+
+  void _drawCrack(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final h = size.height;
+    final crack = Path()
+      ..moveTo(cx, 0)
+      ..lineTo(cx + 2, h * 0.14)
+      ..lineTo(cx - 3, h * 0.28)
+      ..lineTo(cx + 2.5, h * 0.46)
+      ..lineTo(cx - 2, h * 0.62)
+      ..lineTo(cx + 1.5, h * 0.78)
+      ..lineTo(cx, h);
+    canvas.drawPath(
+      crack,
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.7 * crackProgress)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _FestivalTicketPainter old) =>
+      old.baseColor != baseColor ||
+      old.goldStripe != goldStripe ||
+      old.crackProgress != crackProgress;
+}
+
+class _HalfClipper extends CustomClipper<Rect> {
+  _HalfClipper({required this.left});
+  final bool left;
+
+  @override
+  Rect getClip(Size size) => left
+      ? Rect.fromLTWH(0, 0, size.width / 2, size.height)
+      : Rect.fromLTWH(size.width / 2, 0, size.width / 2, size.height);
+
+  @override
+  bool shouldReclip(covariant _HalfClipper old) => old.left != left;
+}
+
+class _AnimatedTicketLife extends StatefulWidget {
+  const _AnimatedTicketLife({
+    super.key,
+    required this.alive,
+    required this.binColor,
+    required this.fallLeft,
+  });
+
+  static const double ticketWidth = 28;
+
+  final bool alive;
+  final Color binColor;
+  final bool fallLeft;
+
+  @override
+  State<_AnimatedTicketLife> createState() => _AnimatedTicketLifeState();
+}
+
+class _AnimatedTicketLifeState extends State<_AnimatedTicketLife>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  bool _dying = false;
+  bool _dead = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..addStatusListener((s) {
+        if (s == AnimationStatus.completed) {
+          setState(() {
+            _dying = false;
+            _dead = true;
+          });
+        }
+      });
+    if (!widget.alive) _dead = true;
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedTicketLife old) {
+    super.didUpdateWidget(old);
+    if (!old.alive && widget.alive) {
+      _dying = false;
+      _dead = false;
+      _ctrl.reset();
+    } else if (old.alive && !widget.alive && !_dying) {
+      _dying = true;
+      _dead = false;
+      _ctrl.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final w = _AnimatedTicketLife.ticketWidth;
+    final h = w * 1.3;
+
+    if (_dead && !_dying) {
+      return SizedBox(width: w, height: h);
+    }
+
+    if (!_dying) {
+      return SizedBox(
+        width: w,
+        height: h,
+        child: CustomPaint(
+          painter: _FestivalTicketPainter(
+            baseColor: widget.binColor,
+            goldStripe: true,
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: w,
+      height: h,
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (context, _) {
+          final t = _ctrl.value;
+
+          if (t <= 0.35) {
+            final pt = t / 0.35;
+            final shake = sin(pt * 6 * pi) * (1 - pt) * 3.0;
+            final crack = Curves.easeIn.transform(pt);
+            return Transform.translate(
+              offset: Offset(shake, 0),
+              child: CustomPaint(
+                size: Size(w, h),
+                painter: _FestivalTicketPainter(
+                  baseColor: widget.binColor,
+                  goldStripe: true,
+                  crackProgress: crack,
+                ),
+              ),
+            );
+          }
+
+          final pt = ((t - 0.35) / 0.65).clamp(0.0, 1.0);
+          final eased = Curves.easeInCubic.transform(pt);
+          final dir = widget.fallLeft ? -1.0 : 1.0;
+          final fade = (1.0 - Curves.easeIn.transform(pt)).clamp(0.0, 1.0);
+
+          Widget halfPiece({required bool left}) {
+            final dx = dir * eased * w * (left ? 0.7 : 1.1);
+            final dy = eased * w * (left ? 0.4 : 0.6);
+            final rot = dir * eased * (left ? -0.35 : 0.45);
+            return Positioned.fill(
+              child: Transform(
+                alignment:
+                    left ? Alignment.centerRight : Alignment.centerLeft,
+                transform: Matrix4.identity()
+                  ..translate(dx, dy)
+                  ..rotateZ(rot),
+                child: Opacity(
+                  opacity: fade,
+                  child: ClipRect(
+                    clipper: _HalfClipper(left: left),
+                    child: CustomPaint(
+                      size: Size(w, h),
+                      painter: _FestivalTicketPainter(
+                        baseColor: widget.binColor,
+                        goldStripe: true,
+                        crackProgress: 1.0,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              halfPiece(left: true),
+              halfPiece(left: false),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
 class ToiletCompetitivePage extends StatefulWidget {
   const ToiletCompetitivePage({super.key});
 
@@ -107,8 +387,12 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   int _depositFxCounter = 0;
 
   Timer? _frameTimer;
+  Timer? _countdownTimer;
 
   _GamePhase _phase = _GamePhase.intro;
+  bool _p1Ready = false;
+  bool _p2Ready = false;
+  int? _countdown;
 
   @override
   void initState() {
@@ -119,8 +403,28 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   @override
   void dispose() {
     _frameTimer?.cancel();
+    _countdownTimer?.cancel();
     _audioPlayer.dispose();
     super.dispose();
+  }
+
+  void _beginCountdown() {
+    if (_countdown != null) return;
+    setState(() => _countdown = 3);
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final next = _countdown! - 1;
+      if (next <= 0) {
+        timer.cancel();
+        setState(() => _countdown = null);
+        _startGame();
+      } else {
+        setState(() => _countdown = next);
+      }
+    });
   }
 
   void _startGame() {
@@ -197,7 +501,13 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
               onPressed: () {
                 Navigator.of(c).pop();
                 if (mounted) {
-                  setState(() => _phase = _GamePhase.intro);
+                  _countdownTimer?.cancel();
+                  setState(() {
+                    _phase = _GamePhase.intro;
+                    _p1Ready = false;
+                    _p2Ready = false;
+                    _countdown = null;
+                  });
                 }
               },
               child: const Text('Opnieuw'),
@@ -620,18 +930,248 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
   }
 
-  Widget _hearts(int lives) {
+
+  Widget _introPlayerSide({
+    required String playerLabel,
+    required String roleLabel,
+    required String binLabel,
+    required String instruction,
+    required Color color,
+    required List<Color> bgGradient,
+    required bool isReady,
+    required VoidCallback onReady,
+    required int quarterTurns,
+    required String statusText,
+    required bool otherReady,
+    int? countdown,
+  }) {
+    final maxLives = _logic.config.startLives;
+
+    final Widget statusBadge;
+    if (countdown != null) {
+      statusBadge = Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          color: const Color(0xFF3A6B3A),
+          shape: BoxShape.circle,
+          boxShadow: const [
+            BoxShadow(color: Color(0x44000000), blurRadius: 10, offset: Offset(0, 3)),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          '$countdown',
+          style: const TextStyle(
+            fontSize: 40,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFFF4F4F1),
+          ),
+        ),
+      );
+    } else {
+      statusBadge = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        decoration: BoxDecoration(
+          color: otherReady
+              ? const Color(0xFF3A6B3A)
+              : const Color(0xFF2D3A2E),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 2)),
+          ],
+        ),
+        child: Text(
+          statusText,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFFF4F4F1),
+            letterSpacing: 0.3,
+          ),
+        ),
+      );
+    }
+
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          playerLabel,
+          style: const TextStyle(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1E2A1F),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          roleLabel,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: color.computeLuminance() > 0.5
+                ? const Color(0xFF3A5A30)
+                : const Color(0xFF6B4400),
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(maxLives, (i) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: SizedBox(
+                width: 32,
+                height: 32 * 1.3,
+                child: CustomPaint(
+                  painter: _FestivalTicketPainter(
+                    baseColor: color,
+                    goldStripe: true,
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          instruction,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            color: Color(0xFF3A3A3A),
+          ),
+        ),
+        const SizedBox(height: 28),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: isReady
+              ? Container(
+                  key: const ValueKey('ready'),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 28, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: color, width: 2),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, color: color, size: 22),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Ready!',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: color.computeLuminance() > 0.5
+                              ? const Color(0xFF2A4A20)
+                              : const Color(0xFF6B4400),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ElevatedButton(
+                  key: const ValueKey('join'),
+                  onPressed: onReady,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: color,
+                    foregroundColor: const Color(0xFF1E2A1F),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    elevation: 3,
+                  ),
+                  child: const Text(
+                    'Join!',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: bgGradient,
+        ),
+      ),
+      child: RotatedBox(
+        quarterTurns: quarterTurns,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: statusBadge,
+            ),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  child: content,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _scoreBadge(int score, Color binColor) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F4F1),
+        shape: BoxShape.circle,
+        border: Border.all(color: binColor, width: 2.5),
+        boxShadow: const [
+          BoxShadow(color: Color(0x33000000), blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        '$score',
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          color: binColor.computeLuminance() > 0.5
+              ? const Color(0xFF1E2A1F)
+              : binColor,
+        ),
+      ),
+    );
+  }
+
+  Widget _tickets(int lives, BinType binType, {required bool fallLeft}) {
     final maxL = _logic.config.startLives;
+    final color = _binTintFor(binType);
 
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: List.generate(maxL, (i) {
-        final alive = i < lives;
+        final alive = fallLeft ? i < lives : i >= (maxL - lives);
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Icon(
-            Icons.favorite,
-            size: 28,
-            color: alive ? const Color(0xFFE78AA0) : Colors.grey.shade400,
+          child: _AnimatedTicketLife(
+            key: ValueKey('ticket_${fallLeft ? "p1" : "p2"}_$i'),
+            alive: alive,
+            binColor: color,
+            fallLeft: fallLeft,
           ),
         );
       }),
@@ -952,37 +1492,57 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     if (_phase == _GamePhase.intro) {
       return Scaffold(
         backgroundColor: const Color(0xFFF4F4F1),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Toilet Competitive',
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+        body: SafeArea(
+          child: Row(
+            children: [
+              Expanded(
+                child: _introPlayerSide(
+                  playerLabel: 'Player 1',
+                  roleLabel: 'Stage Builder',
+                  binLabel: 'Organic',
+                  instruction:
+                      'Drag waste to your bin (Organic).\n'
+                      'Wrong bin or non-recyclable\n= festival pass lost!',
+                  color: const Color(0xFFAEDC9B),
+                  bgGradient: const [Color(0xFFE8F5E3), Color(0xFFC8E6C0)],
+                  isReady: _p1Ready,
+                  onReady: () {
+                    setState(() => _p1Ready = true);
+                    if (_p2Ready) _beginCountdown();
+                  },
+                  quarterTurns: 1,
+                  otherReady: _p2Ready,
+                  countdown: _countdown,
+                  statusText: _p2Ready
+                      ? 'Player 2 joined!'
+                      : 'Waiting for Player 2...',
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Links = Speler 1, Rechts = Speler 2.\n'
-                  'Sleep afval naar je eigen emmer.\n'
-                  'Foute bak of niet-recyclebaar afval = hart kwijt.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16),
+              ),
+              Container(width: 2, color: const Color(0xFFB8C5B0)),
+              Expanded(
+                child: _introPlayerSide(
+                  playerLabel: 'Player 2',
+                  roleLabel: 'Personal Assistant',
+                  binLabel: 'Plastic',
+                  instruction:
+                      'Drag waste to your bin (Plastic).\n'
+                      'Wrong bin or non-recyclable\n= festival pass lost!',
+                  color: const Color(0xFFFFC16A),
+                  bgGradient: const [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
+                  isReady: _p2Ready,
+                  onReady: () {
+                    setState(() => _p2Ready = true);
+                    if (_p1Ready) _beginCountdown();
+                  },
+                  quarterTurns: 3,
+                  otherReady: _p1Ready,
+                  countdown: _countdown,
+                  statusText: _p1Ready
+                      ? 'Player 1 joined!'
+                      : 'Waiting for Player 1...',
                 ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _startGame,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFDCEBD8),
-                    foregroundColor: const Color(0xFF1E2A1F),
-                  ),
-                  child: Text(
-                    'Start ronde (${_logic.config.gameDurationSec}s)',
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
@@ -1013,12 +1573,12 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
               Positioned(
                 left: 20,
                 top: 12,
-                child: _hearts(p1.lives),
+                child: _tickets(p1.lives, p1.binType, fallLeft: true),
               ),
               Positioned(
                 right: 20,
                 top: 12,
-                child: _hearts(p2.lives),
+                child: _tickets(p2.lives, p2.binType, fallLeft: false),
               ),
               Positioned(
                 top: max(18.0, playArea.top - timerDiameter - 50.0),
@@ -1050,67 +1610,59 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 ),
               ),
               Positioned(
-                left: 20,
-                top: 12 + 28 + 8,
-                child: Text(
-                  'P1: ${p1.score}',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1E2A1F),
-                  ),
-                ),
-              ),
-              Positioned(
                 left: p1Bucket.left,
                 top: p1Bucket.top,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    _imageOrFallback(
-                      path: _bucketAssetLeft,
-                      width: p1Bucket.width,
-                      height: p1Bucket.height,
-                      fallbackColor: _binTintFor(p1.binType),
-                      fit: BoxFit.contain,
-                      alignment: Alignment.bottomCenter,
-                      flipX: false,
-                    ),
-                  ],
+                child: SizedBox(
+                  width: p1Bucket.width,
+                  height: p1Bucket.height,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      _imageOrFallback(
+                        path: _bucketAssetLeft,
+                        width: p1Bucket.width,
+                        height: p1Bucket.height,
+                        fallbackColor: _binTintFor(p1.binType),
+                        fit: BoxFit.contain,
+                        alignment: Alignment.bottomCenter,
+                        flipX: false,
+                      ),
+                      RotatedBox(
+                        quarterTurns: 1,
+                        child: _scoreBadge(p1.score, _binTintFor(p1.binType)),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               Positioned(
                 left: p2Bucket.left,
                 top: p2Bucket.top,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    _imageOrFallback(
-                      path: _bucketAssetRight,
-                      width: p2Bucket.width,
-                      height: p2Bucket.height,
-                      fallbackColor: _binTintFor(p2.binType),
-                      fit: BoxFit.contain,
-                      alignment: Alignment.bottomCenter,
-                      flipX: false,
-                    ),
-                  ],
+                child: SizedBox(
+                  width: p2Bucket.width,
+                  height: p2Bucket.height,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      _imageOrFallback(
+                        path: _bucketAssetRight,
+                        width: p2Bucket.width,
+                        height: p2Bucket.height,
+                        fallbackColor: _binTintFor(p2.binType),
+                        fit: BoxFit.contain,
+                        alignment: Alignment.bottomCenter,
+                        flipX: false,
+                      ),
+                      RotatedBox(
+                        quarterTurns: 3,
+                        child: _scoreBadge(p2.score, _binTintFor(p2.binType)),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               ..._itemWidgets(),
               ..._depositFxWidgets(),
-              Positioned(
-                right: 20,
-                top: 12 + 28 + 8,
-                child: Text(
-                  'P2: ${p2.score}',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1E2A1F),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
