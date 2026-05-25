@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/animation.dart';
 
+import 'toiletC_item_assets.dart';
 import 'toiletC_models.dart';
 
 class ToiletCompetitiveLogic {
@@ -96,6 +97,7 @@ class ToiletCompetitiveLogic {
 
     final spawnType = _rollItemType();
     final spawnPoint = _pickSpawnPoint(state);
+    final orientation = _rollItemOrientation();
     state.activeItems.add(
       CompetitiveItemSpawn(
         id: 'i_${state.idCounter++}',
@@ -104,6 +106,8 @@ class ToiletCompetitiveLogic {
         ttlSec: ttlSec,
         spawnXNorm: spawnPoint.$1,
         spawnYNorm: spawnPoint.$2,
+        spawnRotationRad: orientation.$1,
+        spawnFlipX: orientation.$2,
       ),
     );
     _rememberSpawnedType(spawnType);
@@ -142,6 +146,16 @@ class ToiletCompetitiveLogic {
     }
 
     return (bestX, bestY);
+  }
+
+  /// Random tilt + occasional quarter-turn so sprites are not all aligned the same.
+  (double, bool) _rollItemOrientation() {
+    final tilt = (_rng.nextDouble() - 0.5) * 0.95;
+    if (_rng.nextDouble() < 0.42) {
+      final quarterTurn = _rng.nextInt(4) * (pi / 2);
+      return (tilt + quarterTurn, _rng.nextBool());
+    }
+    return (tilt, _rng.nextDouble() < 0.22);
   }
 
   int _maxActiveItemsAt(double timeSec) {
@@ -323,6 +337,25 @@ class ToiletCompetitiveLogic {
     if (item.ttlSec <= 0) return 1.0;
 
     return (age / item.ttlSec).clamp(0.0, 1.0);
+  }
+
+  ItemAgeStage itemAgeStage(
+    ToiletCompetitiveState state,
+    CompetitiveItemSpawn item,
+  ) {
+    return ToiletCompetitiveItemAssets.stageFromProgress(
+      itemAgeProgress(state, item),
+    );
+  }
+
+  String itemAssetPath(
+    ToiletCompetitiveState state,
+    CompetitiveItemSpawn item,
+  ) {
+    return ToiletCompetitiveItemAssets.pathForProgress(
+      item.type,
+      itemAgeProgress(state, item),
+    );
   }
 
   double itemActiveAgeSec(

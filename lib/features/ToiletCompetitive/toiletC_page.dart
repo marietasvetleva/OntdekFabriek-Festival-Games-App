@@ -22,6 +22,7 @@ class _ItemLayout {
   double y;
   int? draggedByPlayer;
   double? frozenSize;
+  String? frozenAssetPath;
 }
 
 class _DepositFx {
@@ -37,6 +38,8 @@ class _DepositFx {
     required this.endCenter,
     required this.baseSize,
     required this.artScale,
+    required this.baseRotationRad,
+    required this.flipX,
   });
 
   final String id;
@@ -50,6 +53,8 @@ class _DepositFx {
   final Offset endCenter;
   final double baseSize;
   final double artScale;
+  final double baseRotationRad;
+  final bool flipX;
 }
 
 class _FestivalTicketPainter extends CustomPainter {
@@ -340,8 +345,8 @@ class ToiletCompetitivePage extends StatefulWidget {
 }
 
 class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
-  static const double _itemMinSize = 110;
-  static const double _itemStartSize = 135;
+  static const double _itemMinSize = 120;
+  static const double _itemStartSize = 148;
   static const double _spawnPopDurationSec = 0.24;
   static const double _spawnStartScale = 0.72;
   static const double _bucketWidth = 200;
@@ -351,25 +356,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
   static const String _bucketAssetLeft = 'assets/ToiletCompetitive/bucket_left.png';
   static const String _bucketAssetRight = 'assets/ToiletCompetitive/bucket_right.png';
-  static const String _cigaretteAsset =
-      'assets/ToiletCompetitive/items/cigarette_bud.png';
-  static const String _gumAsset = 'assets/ToiletCompetitive/items/gum.png';
-  static const String _bananaPeelAsset =
-      'assets/ToiletCompetitive/items/banana_peel.png';
-  static const String _bananaSlightlyAgedAsset =
-      'assets/ToiletCompetitive/items/slightly_aged_banana.png';
-  static const String _bananaVeryAgedAsset =
-      'assets/ToiletCompetitive/items/very_aged_banana.png';
-  static const String _appleCoreAsset =
-      'assets/ToiletCompetitive/items/apple_core.png';
-  static const String _leafAsset = 'assets/ToiletCompetitive/items/leaf.png';
-  static const String _metalCanAsset =
-      'assets/ToiletCompetitive/items/metal_can.png';
-  static const String _juiceBoxAsset =
-      'assets/ToiletCompetitive/items/juice_box.png';
-  static const String _waterBottleAsset =
-      'assets/ToiletCompetitive/items/water_bottle.png';
-
   static const String _sfxGoodCatch =
       'https://assets.mixkit.co/active_storage/sfx/270/270-preview.mp3';
   static const String _sfxBadCatch =
@@ -623,6 +609,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
   void _spawnDepositFx({
     required CompetitiveItemSpawn item,
+    required String assetPath,
     required Offset startCenter,
     required Offset targetCenter,
     required DepositOutcome outcome,
@@ -640,7 +627,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       _DepositFx(
         id: 'fx_${_depositFxCounter++}',
         type: isCorrect ? _DepositFxType.vacuum : _DepositFxType.reject,
-        assetPath: _assetForItem(item),
+        assetPath: assetPath,
         fallbackColor: _bubbleColorForType(item.type),
         startAtSec: now,
         durationSec: isCorrect ? 0.24 : 0.30,
@@ -649,41 +636,18 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         endCenter: rejectEnd,
         baseSize: _itemSizePixels(item),
         artScale: _itemArtScaleForType(item.type),
+        baseRotationRad: item.spawnRotationRad,
+        flipX: item.spawnFlipX,
       ),
     );
   }
 
-  String _assetForType(CompetitiveItemType type) {
-    switch (type) {
-      case CompetitiveItemType.cigaretteBud:
-        return _cigaretteAsset;
-      case CompetitiveItemType.gum:
-        return _gumAsset;
-      case CompetitiveItemType.bananaPeel:
-        return _bananaPeelAsset;
-      case CompetitiveItemType.appleCore:
-        return _appleCoreAsset;
-      case CompetitiveItemType.leaf:
-        return _leafAsset;
-      case CompetitiveItemType.metalCan:
-        return _metalCanAsset;
-      case CompetitiveItemType.juiceBox:
-        return _juiceBoxAsset;
-      case CompetitiveItemType.waterBottle:
-        return _waterBottleAsset;
-    }
-  }
-
   String _assetForItem(CompetitiveItemSpawn item) {
-    if (item.type != CompetitiveItemType.bananaPeel) {
-      return _assetForType(item.type);
+    final layout = _layouts[item.id];
+    if (layout?.frozenAssetPath != null) {
+      return layout!.frozenAssetPath!;
     }
-
-    // Bananas visibly age in 3 distinct steps across their lifetime.
-    final progress = _logic.itemAgeProgress(_gameState, item);
-    if (progress < 0.34) return _bananaPeelAsset;
-    if (progress < 0.67) return _bananaSlightlyAgedAsset;
-    return _bananaVeryAgedAsset;
+    return _logic.itemAssetPath(_gameState, item);
   }
 
   Color _bubbleColorForType(CompetitiveItemType type) {
@@ -706,17 +670,67 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     }
   }
 
+  Offset _itemCenter(_ItemLayout layout, double size) {
+    return Offset(layout.x + size / 2, layout.y + size / 2);
+  }
+
+  Offset _rotateOffset(Offset v, double angleRad) {
+    final c = cos(angleRad);
+    final s = sin(angleRad);
+    return Offset(v.dx * c - v.dy * s, v.dx * s + v.dy * c);
+  }
+
+  bool _pointHitsRotatedItem({
+    required Offset point,
+    required Offset center,
+    required double size,
+    required double angleRad,
+  }) {
+    final local = _rotateOffset(point - center, -angleRad);
+    final half = size / 2 * 0.9;
+    return local.dx.abs() <= half && local.dy.abs() <= half;
+  }
+
   CompetitiveItemSpawn? _hitTestItem(Offset localPosition) {
     for (final item in _gameState.activeItems.reversed) {
       final layout = _layouts[item.id];
       if (layout == null) continue;
 
       final sz = _itemSizePixels(item);
-      final rect = Rect.fromLTWH(layout.x, layout.y, sz, sz);
-
-      if (rect.contains(localPosition)) return item;
+      if (_pointHitsRotatedItem(
+        point: localPosition,
+        center: _itemCenter(layout, sz),
+        size: sz,
+        angleRad: item.spawnRotationRad,
+      )) {
+        return item;
+      }
     }
     return null;
+  }
+
+  Widget _orientedItemArt({
+    required String path,
+    required double size,
+    required Color fallbackColor,
+    required double rotationRad,
+    required bool flipX,
+    required double displayScale,
+  }) {
+    return Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()
+        ..rotateZ(rotationRad)
+        ..scale((flipX ? -1.0 : 1.0) * displayScale, displayScale),
+      child: _imageOrFallback(
+        path: path,
+        width: size,
+        height: size,
+        fallbackColor: fallbackColor,
+        shape: BoxShape.circle,
+        fit: BoxFit.contain,
+      ),
+    );
   }
 
   int? _playerFromPosition(Offset p, Size size) {
@@ -749,6 +763,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       maxSize: _itemStartSize,
       minSize: _itemMinSize,
     );
+    layout.frozenAssetPath ??= _logic.itemAssetPath(_gameState, spawn);
 
     if (!spawn.isBeingHeld) {
       spawn.isBeingHeld = true;
@@ -826,6 +841,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
       if (bucketOwner == null) {
         layout.frozenSize = null;
+        layout.frozenAssetPath = null;
         continue;
       }
 
@@ -840,6 +856,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           _safePlaySfx(_sfxGoodCatch);
           _spawnDepositFx(
             item: spawn,
+            assetPath:
+                layout.frozenAssetPath ??
+                _logic.itemAssetPath(_gameState, spawn),
             startCenter: itemCenter,
             targetCenter: bucketOwner == 1
                 ? _rectCenter(p1CatchRect)
@@ -851,6 +870,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           _safePlaySfx(_sfxBadCatch);
           _spawnDepositFx(
             item: spawn,
+            assetPath:
+                layout.frozenAssetPath ??
+                _logic.itemAssetPath(_gameState, spawn),
             startCenter: itemCenter,
             targetCenter: bucketOwner == 1
                 ? _rectCenter(p1CatchRect)
@@ -1264,20 +1286,19 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         Positioned(
           left: layout.x,
           top: layout.y,
+          width: sz,
+          height: sz,
           child: Transform.translate(
             offset: Offset(wobbleX, wobbleY),
             child: Opacity(
               opacity: spawnOpacity,
-              child: Transform.scale(
-                scale: scale * popScale,
-                child: _imageOrFallback(
-                  path: _assetForItem(item),
-                  width: sz,
-                  height: sz,
-                  fallbackColor: _bubbleColorForType(item.type),
-                  shape: BoxShape.circle,
-                  fit: BoxFit.contain,
-                ),
+              child: _orientedItemArt(
+                path: _assetForItem(item),
+                size: sz,
+                fallbackColor: _bubbleColorForType(item.type),
+                rotationRad: item.spawnRotationRad,
+                flipX: item.spawnFlipX,
+                displayScale: scale * popScale,
               ),
             ),
           ),
@@ -1306,7 +1327,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         center = Offset.lerp(fx.startCenter, fx.targetCenter, move)!;
         scale = lerpDouble(1.0, 0.18, Curves.easeIn.transform(t))!;
         opacity = lerpDouble(1.0, 0.0, Curves.easeIn.transform(t))!;
-        rotation = t * pi * 1.6;
+        rotation = fx.baseRotationRad + t * pi * 1.6;
       } else {
         // Wrong bin: impact + hard deflection away from bin.
         const hitPoint = 0.46;
@@ -1315,14 +1336,18 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           center = Offset.lerp(fx.startCenter, fx.targetCenter, s)!;
           scale = 1.0;
           opacity = 1.0;
-          rotation = 0.0;
+          rotation = fx.baseRotationRad;
         } else {
           final phase = ((t - hitPoint) / (1.0 - hitPoint)).clamp(0.0, 1.0);
           final s = Curves.easeOutCubic.transform(phase);
           center = Offset.lerp(fx.targetCenter, fx.endCenter, s)!;
           scale = lerpDouble(1.0, 0.76, Curves.easeOut.transform(phase))!;
           opacity = lerpDouble(1.0, 0.0, Curves.easeOut.transform(phase))!;
-          rotation = lerpDouble(0.0, -pi * 0.22, Curves.easeOut.transform(phase))!;
+          rotation = lerpDouble(
+            fx.baseRotationRad,
+            fx.baseRotationRad - pi * 0.22,
+            Curves.easeOut.transform(phase),
+          )!;
         }
       }
 
@@ -1331,18 +1356,17 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         Positioned(
           left: center.dx - fxSize / 2,
           top: center.dy - fxSize / 2,
+          width: fxSize,
+          height: fxSize,
           child: Opacity(
             opacity: opacity.clamp(0.0, 1.0),
-            child: Transform.rotate(
-              angle: rotation,
-              child: _imageOrFallback(
-                path: fx.assetPath,
-                width: fxSize,
-                height: fxSize,
-                fallbackColor: fx.fallbackColor,
-                shape: BoxShape.circle,
-                fit: BoxFit.contain,
-              ),
+            child: _orientedItemArt(
+              path: fx.assetPath,
+              size: fxSize,
+              fallbackColor: fx.fallbackColor,
+              rotationRad: rotation,
+              flipX: fx.flipX,
+              displayScale: 1.0,
             ),
           ),
         ),

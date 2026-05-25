@@ -99,6 +99,9 @@ class CompetitiveItemSpawn {
   final double ttlSec;
   final double spawnXNorm;
   final double spawnYNorm;
+  /// Fixed tilt when spawned so items do not all read horizontal/vertical.
+  final double spawnRotationRad;
+  final bool spawnFlipX;
 
   bool isBeingHeld;
   double totalHeldSec;
@@ -111,6 +114,8 @@ class CompetitiveItemSpawn {
     required this.ttlSec,
     this.spawnXNorm = 0.5,
     this.spawnYNorm = 0.5,
+    this.spawnRotationRad = 0,
+    this.spawnFlipX = false,
     this.isBeingHeld = false,
     this.totalHeldSec = 0,
     this.holdStartedAtSec,
