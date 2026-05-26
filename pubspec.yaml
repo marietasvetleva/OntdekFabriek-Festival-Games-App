@@ -89,6 +89,9 @@ flutter:
     - assets/StageGameV2-image/frame.png
     - assets/StageGameV2-image/Stage_top_view.png
 
+    # Stage right panel images
+    - assets/StageGameV2-image/right_panel/
+
     # festival cleaner images
     - assets/trashGame/
     - assets/trashGame/BackgroundFlow/
