@@ -91,7 +91,9 @@ flutter:
 
     # Stage right panel images
     - assets/StageGameV2-image/right_panel/
-
+    - assets/StageGameV2-image/effects/
+    - assets/StageGameV2-image/
+    
     # festival cleaner images
     - assets/trashGame/
     - assets/trashGame/BackgroundFlow/

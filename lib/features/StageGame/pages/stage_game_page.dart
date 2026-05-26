@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/led_service.dart';
@@ -13,16 +14,38 @@ class StageGamePage extends StatefulWidget {
   State<StageGamePage> createState() => _StageGamePageState();
 }
 
-class _StageGamePageState extends State<StageGamePage> {
+class _StageGamePageState extends State<StageGamePage>
+    with SingleTickerProviderStateMixin {
   final StageGameLogic _logic = StageGameLogic();
   late StageGameState _state;
 
   /*
     AANWIJZING:
-    Deze bool voorkomt dat de game meerdere keren naar de final screen gaat.
-    Dit is vooral belangrijk bij power overload, omdat elke keuze opnieuw
-    een check kan doen.
+    Alle nieuwe middle-stage assets staan direct in:
+    assets/StageGameV2-image/
+
+    Deze assets komen van je klasgenoot:
+    - cheapspeaker.png
+    - ecospeaker-removebg-preview.png
+    - prospeaker.png
+    - led.png
+    - smart.png
+    - halogen.png
+    - solar.png
+    - hybrid.png
+    - generator.png
+    - laser.png
+    - drone.png
+    - firewoks.png
+
+    Let op:
+    In jouw screenshot heet het bestand firewoks.png.
+    Als jouw bestand anders heet, pas alleen de naam aan in _effectAsset().
   */
+  static const String _assetBase = 'assets/StageGameV2-image';
+
+  late final AnimationController _stageFxController;
+
   bool _isEndingRound = false;
 
   @override
@@ -31,18 +54,19 @@ class _StageGamePageState extends State<StageGamePage> {
 
     _state = _logic.createInitialState();
     _logic.start(_state);
+
+    _stageFxController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1900),
+    )..repeat();
   }
 
-  /*
-    AANWIJZING:
-    Nieuwe gameplay-regel:
-    Power overload betekent direct verliezen.
+  @override
+  void dispose() {
+    _stageFxController.dispose();
+    super.dispose();
+  }
 
-    Waarom?
-    - De rechter speler wordt belangrijker.
-    - De rechter console is niet alleen een dashboard.
-    - De speler moet echt opletten of de stage veilig blijft.
-  */
   void _checkForInstantPowerFailure() {
     if (_isEndingRound) return;
 
@@ -58,14 +82,15 @@ class _StageGamePageState extends State<StageGamePage> {
     if (_isEndingRound) return;
 
     setState(() {
+      /*
+        AANWIJZING:
+        Bij power overload locken we direct de keuzes.
+        De speler kan dus 7 seconden kijken naar de fout,
+        maar niks meer aanpassen.
+      */
       _isEndingRound = true;
     });
 
-    /*
-      AANWIJZING:
-      Kleine delay zodat de speler eerst de overload feedback ziet.
-      Anders voelt het alsof de app ineens weg springt.
-    */
     await Future.delayed(const Duration(seconds: 7));
 
     try {
@@ -166,10 +191,61 @@ class _StageGamePageState extends State<StageGamePage> {
 
   /*
     AANWIJZING:
-    Deze ChoiceChip methode blijft bestaan voor mobile layout.
-    Voor tablet/wide layout gebruikt de linker speler nu de nieuwe
-    game-controller equipment cards.
+    Deze asset methodes zijn gebaseerd op het werk van je klasgenoot,
+    maar aangepast naar jouw huidige enums en juiste Flutter asset paths.
   */
+  String? _soundAsset() {
+    switch (_state.selectedSound) {
+      case SoundOption.cheap:
+        return '$_assetBase/cheapspeaker.png';
+      case SoundOption.eco:
+        return '$_assetBase/ecospeaker-removebg-preview.png';
+      case SoundOption.pro:
+        return '$_assetBase/prospeaker.png';
+      default:
+        return null;
+    }
+  }
+
+  String? _lightAsset() {
+    switch (_state.selectedLight) {
+      case LightOption.led:
+        return '$_assetBase/led.png';
+      case LightOption.smart:
+        return '$_assetBase/smart.png';
+      case LightOption.halogen:
+        return '$_assetBase/halogen.png';
+      default:
+        return null;
+    }
+  }
+
+  String? _powerAsset() {
+    switch (_state.selectedPowerSource) {
+      case PowerSourceOption.solar:
+        return '$_assetBase/solar.png';
+      case PowerSourceOption.hybrid:
+        return '$_assetBase/hybrid.png';
+      case PowerSourceOption.generator:
+        return '$_assetBase/generator.png';
+      default:
+        return null;
+    }
+  }
+
+  String? _effectAsset() {
+    switch (_state.selectedEffect) {
+      case EffectOption.laser:
+        return '$_assetBase/laser.png';
+      case EffectOption.drone:
+        return '$_assetBase/drone.png';
+      case EffectOption.fireworks:
+        return '$_assetBase/firewoks.png';
+      default:
+        return null;
+    }
+  }
+
   Widget _buildChoiceWrap<T>({
     required List<T> options,
     required T? selected,
@@ -219,7 +295,6 @@ class _StageGamePageState extends State<StageGamePage> {
         setState(() {
           _logic.selectSound(_state, option);
         });
-
         _checkForInstantPowerFailure();
       },
     );
@@ -235,7 +310,6 @@ class _StageGamePageState extends State<StageGamePage> {
         setState(() {
           _logic.selectLight(_state, option);
         });
-
         _checkForInstantPowerFailure();
       },
     );
@@ -251,7 +325,6 @@ class _StageGamePageState extends State<StageGamePage> {
         setState(() {
           _logic.selectPowerSource(_state, option);
         });
-
         _checkForInstantPowerFailure();
       },
     );
@@ -267,7 +340,6 @@ class _StageGamePageState extends State<StageGamePage> {
         setState(() {
           _logic.selectEffect(_state, option);
         });
-
         _checkForInstantPowerFailure();
       },
     );
@@ -329,18 +401,6 @@ class _StageGamePageState extends State<StageGamePage> {
     );
   }
 
-  /*
-    AANWIJZING:
-    Nieuwe linker panel versie.
-
-    Wat is veranderd:
-    - Emoji buttons zijn vervangen door Flutter Icons.
-    - Het ziet nu meer uit als een game equipment controller.
-    - Buttons hebben selected glow en betere icon styling.
-    - De categorieën hebben zachte kleuren.
-    - Preset buttons voelen meer als quick build presets.
-    - Left panel blijft 270 breed zodat er geen overflow komt.
-  */
   Widget _buildPlayerOneConsole(double boardHeight) {
     const panelWidth = 270.0;
 
@@ -522,19 +582,10 @@ class _StageGamePageState extends State<StageGamePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          /*
-            AANWIJZING:
-            Titel heeft nu een klein icon erbij.
-            Dit maakt elke categorie sneller herkenbaar.
-          */
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 13,
-                color: accentColor,
-              ),
+              Icon(icon, size: 13, color: accentColor),
               const SizedBox(width: 3),
               Flexible(
                 child: Text(
@@ -599,15 +650,6 @@ class _StageGamePageState extends State<StageGamePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            /*
-              AANWIJZING:
-              Flutter icon in plaats van emoji.
-
-              Waarom?
-              - ziet professioneler uit
-              - beter schaalbaar
-              - minder random styling tussen devices
-            */
             AnimatedScale(
               scale: selected ? 1.12 : 1,
               duration: const Duration(milliseconds: 170),
@@ -644,7 +686,8 @@ class _StageGamePageState extends State<StageGamePage> {
                 fontSize: 8,
                 height: 1,
                 fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                color: selected ? const Color(0xFF263524) : const Color(0xFF333333),
+                color:
+                    selected ? const Color(0xFF263524) : const Color(0xFF333333),
               ),
             ),
           ],
@@ -678,11 +721,7 @@ class _StageGamePageState extends State<StageGamePage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 13,
-                color: color,
-              ),
+              Icon(icon, size: 13, color: color),
               const SizedBox(width: 3),
               Text(
                 label,
@@ -916,18 +955,6 @@ class _StageGamePageState extends State<StageGamePage> {
   }
 
   Widget _buildPlayerTwoConsole(double boardHeight) {
-    /*
-      AANWIJZING:
-      Right panel blijft kleiner.
-
-      Eerst: 500
-      Nu: 455
-
-      Waarom?
-      - left panel heeft iets meer ruimte nodig.
-      - stage blijft nog steeds groot genoeg.
-      - right panel voelt minder zwaar/dashboard-achtig.
-    */
     const panelWidth = 455.0;
 
     return SizedBox(
@@ -952,7 +979,7 @@ class _StageGamePageState extends State<StageGamePage> {
         _state.totalPowerLoad > _state.currentPowerCapacity;
 
     final lightColor = _selectedLightColor();
-    final lightOpacity = _state.selectedLight == null ? 0.06 : 0.22;
+    final lightOpacity = _state.selectedLight == null ? 0.04 : 0.18;
 
     return Container(
       height: height,
@@ -975,130 +1002,103 @@ class _StageGamePageState extends State<StageGamePage> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned.fill(
-              child: Container(
-                color: const Color(0xFFF2EEE4),
-              ),
-            ),
-            Positioned.fill(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 450),
-                curve: Curves.easeOut,
-                color: lightColor.withOpacity(lightOpacity),
-              ),
-            ),
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: RotatedBox(
-                    quarterTurns: 1,
-                    child: Image.asset(
-                      'assets/StageGameV2-image/Stage_top_view.png',
+        child: AnimatedBuilder(
+          animation: _stageFxController,
+          builder: (context, child) {
+            final pulse = _stageFxController.value;
+
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned.fill(
+                  child: Container(
+                    color: const Color(0xFFF2EEE4),
+                  ),
+                ),
+
+                /*
+                  AANWIJZING:
+                  Kleurlaag afhankelijk van gekozen light.
+                  Dit blijft subtiel zodat de stage image zichtbaar blijft.
+                */
+                Positioned.fill(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeOut,
+                    color: lightColor.withOpacity(lightOpacity),
+                  ),
+                ),
+
+                if (_state.selectedLight != null)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: _buildStageGlow(lightColor),
+                    ),
+                  ),
+
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: RotatedBox(
+                        quarterTurns: 1,
+                        child: Image.asset(
+                          '$_assetBase/Stage_top_view.png',
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            _buildStageLight(
-              top: 48,
-              left: 90,
-              color: lightColor,
-            ),
-            _buildStageLight(
-              top: 48,
-              right: 90,
-              color: lightColor,
-            ),
-            if (_state.selectedEffect == EffectOption.laser) ...[
-              _buildLaserBeam(
-                left: 105,
-                top: 130,
-                angle: -0.55,
-              ),
-              _buildLaserBeam(
-                right: 105,
-                top: 130,
-                angle: 0.55,
-              ),
-            ],
-            if (_state.selectedEffect == EffectOption.drone) ...[
-              const Positioned(
-                top: 92,
-                left: 130,
-                child: Icon(
-                  Icons.airplanemode_active,
-                  color: Colors.white,
-                  size: 36,
-                ),
-              ),
-              const Positioned(
-                top: 112,
-                right: 140,
-                child: Icon(
-                  Icons.airplanemode_active,
-                  color: Colors.white,
-                  size: 34,
-                ),
-              ),
-            ],
-            if (_state.selectedEffect == EffectOption.fireworks) ...[
-              const Positioned(
-                top: 105,
-                left: 145,
-                child: Text(
-                  '🎆',
-                  style: TextStyle(fontSize: 44),
-                ),
-              ),
-              const Positioned(
-                top: 90,
-                right: 150,
-                child: Text(
-                  '🎇',
-                  style: TextStyle(fontSize: 44),
-                ),
-              ),
-            ],
-            if (isOverloaded)
-              Positioned.fill(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD26455).withOpacity(0.58),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
+
+                /*
+                  AANWIJZING:
+                  Nieuwe middle stage:
+                  Hier plaatsen we de assets van je klasgenoot op de stage.
+                */
+                _buildSelectedPowerOnStage(pulse),
+                _buildSelectedSoundOnStage(pulse),
+                _buildSelectedLightOnStage(pulse),
+                _buildSelectedEffectOnStage(pulse),
+                _buildCrowdReactionBubbles(pulse),
+
+                if (isOverloaded)
+                  Positioned.fill(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.16),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.45),
-                          width: 1.3,
-                        ),
+                        color: const Color(0xFFD26455).withOpacity(0.58),
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                      child: Text(
-                        '⚠ POWER OVERLOAD ⚠',
-                        style: GoogleFonts.caveat(
-                          color: Colors.white,
-                          fontSize: 34,
-                          fontWeight: FontWeight.w900,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.16),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.45),
+                              width: 1.3,
+                            ),
+                          ),
+                          child: Text(
+                            '⚠ POWER OVERLOAD ⚠',
+                            style: GoogleFonts.caveat(
+                              color: Colors.white,
+                              fontSize: 34,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1106,76 +1106,557 @@ class _StageGamePageState extends State<StageGamePage> {
 
   Color _selectedLightColor() {
     if (_state.selectedLight == LightOption.led) {
-      return const Color(0xFF7AB7E8);
+      return const Color(0xFF62B6F0);
     }
 
     if (_state.selectedLight == LightOption.smart) {
-      return const Color(0xFFD15AF0);
+      return const Color(0xFFC45BFF);
     }
 
     if (_state.selectedLight == LightOption.halogen) {
-      return const Color(0xFFF0A23E);
+      return const Color(0xFFFFA33A);
     }
 
     return const Color(0xFFBFC0B4);
   }
 
-  Widget _buildStageLight({
-    required double top,
-    double? left,
-    double? right,
-    required Color color,
-  }) {
-    return Positioned(
-      top: top,
-      left: left,
-      right: right,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(
-          begin: 0.75,
-          end: _state.selectedLight == null ? 0.75 : 1,
-        ),
-        duration: const Duration(milliseconds: 500),
-        builder: (context, scale, child) {
-          return Transform.scale(
-            scale: scale,
-            child: child,
-          );
-        },
-        child: Icon(
-          Icons.lightbulb,
-          color: color,
-          size: 44,
+  Widget _buildStageGlow(Color color) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment.topCenter,
+          radius: 0.95,
+          colors: [
+            color.withOpacity(0.22),
+            color.withOpacity(0.10),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.48, 1.0],
         ),
       ),
     );
   }
 
-  Widget _buildLaserBeam({
+  /*
+    AANWIJZING:
+    Power source asset wordt linksvoor naast de stage gezet.
+    Zo ziet speler dat de gekozen stroombron actief is.
+  */
+  Widget _buildSelectedPowerOnStage(double pulse) {
+    final asset = _powerAsset();
+    if (asset == null) return const SizedBox.shrink();
+
+    return Positioned(
+      left: 72,
+      bottom: 95,
+      child: _stageAssetImage(
+        asset: asset,
+        size: 72,
+        pulse: pulse,
+        label: _state.selectedPowerSource == null
+            ? null
+            : _powerSourceLabel(_state.selectedPowerSource!),
+      ),
+    );
+  }
+
+  /*
+    AANWIJZING:
+    Speakers worden links en rechts van de stage gezet.
+    Dit past beter dan één klein icoon midden in de stage.
+  */
+  Widget _buildSelectedSoundOnStage(double pulse) {
+    final asset = _soundAsset();
+    if (asset == null) return const SizedBox.shrink();
+
+    return Stack(
+      children: [
+        Positioned(
+          left: 135,
+          top: 215 + math.sin(pulse * math.pi * 2) * 2,
+          child: _stageAssetImage(
+            asset: asset,
+            size: 72,
+            pulse: pulse,
+          ),
+        ),
+        Positioned(
+          right: 135,
+          top: 215 + math.sin((pulse + 0.3) * math.pi * 2) * 2,
+          child: Transform.scale(
+            scaleX: -1,
+            child: _stageAssetImage(
+              asset: asset,
+              size: 72,
+              pulse: pulse,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /*
+    AANWIJZING:
+    Light assets worden bij de bovenkant van het podium gezet.
+    De lampen hebben glow in de kleur van de gekozen light.
+  */
+  Widget _buildSelectedLightOnStage(double pulse) {
+    final asset = _lightAsset();
+    if (asset == null) return const SizedBox.shrink();
+
+    final color = _selectedLightColor();
+    final glow = 0.28 + math.sin(pulse * math.pi * 2).abs() * 0.12;
+
+    return Stack(
+      children: [
+        Positioned(
+          left: 180,
+          top: 58,
+          child: _lightRigAsset(asset, color, glow),
+        ),
+        Positioned(
+          right: 180,
+          top: 58,
+          child: _lightRigAsset(asset, color, glow),
+        ),
+        Positioned(
+          left: 250,
+          top: 112,
+          child: _lightRigAsset(asset, color, glow * 0.8, size: 48),
+        ),
+        Positioned(
+          right: 250,
+          top: 112,
+          child: _lightRigAsset(asset, color, glow * 0.8, size: 48),
+        ),
+      ],
+    );
+  }
+
+  Widget _lightRigAsset(
+    String asset,
+    Color color,
+    double glow, {
+    double size = 58,
+  }) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: size + 32,
+          height: size + 32,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withOpacity(0.10),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(glow),
+                blurRadius: 24,
+                spreadRadius: 6,
+              ),
+            ],
+          ),
+        ),
+        Image.asset(
+          asset,
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+        ),
+      ],
+    );
+  }
+
+  /*
+    AANWIJZING:
+    Effect assets worden per type anders geplaatst:
+    - laser: meerdere laser assets met glow
+    - drone: meerdere drones die rond de stage zweven
+    - fireworks: meerdere vuurwerk bursts boven/achter de stage
+  */
+  Widget _buildSelectedEffectOnStage(double pulse) {
+    if (_state.selectedEffect == null) {
+      return const SizedBox.shrink();
+    }
+
+    if (_state.selectedEffect == EffectOption.laser) {
+      return Stack(
+        children: [
+          _laserImage(left: 90, top: 128, angle: -0.55, width: 255, pulse: pulse),
+          _laserImage(right: 90, top: 128, angle: 0.55, width: 255, pulse: pulse),
+          _laserImage(left: 170, top: 176, angle: -0.25, width: 190, pulse: pulse),
+          _laserImage(right: 170, top: 176, angle: 0.25, width: 190, pulse: pulse),
+          Positioned(
+            top: 220,
+            left: 250,
+            right: 250,
+            child: Container(
+              height: 4,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(99),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    const Color(0xFF58E28B).withOpacity(0.65),
+                    const Color(0xFFB8FFD2).withOpacity(0.75),
+                    const Color(0xFF58E28B).withOpacity(0.65),
+                    Colors.transparent,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF58E28B).withOpacity(0.40),
+                    blurRadius: 18,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_state.selectedEffect == EffectOption.drone) {
+      final asset = _effectAsset();
+      if (asset == null) return const SizedBox.shrink();
+
+      return Stack(
+        children: [
+          _droneImage(asset, left: 118, top: 82, size: 52, pulse: pulse, phase: 0),
+          _droneImage(asset, right: 128, top: 104, size: 50, pulse: pulse, phase: 0.25),
+          _droneImage(asset, left: 260, top: 150, size: 44, pulse: pulse, phase: 0.55),
+          _droneImage(asset, right: 275, top: 152, size: 44, pulse: pulse, phase: 0.75),
+        ],
+      );
+    }
+
+    if (_state.selectedEffect == EffectOption.fireworks) {
+      final asset = _effectAsset();
+      if (asset == null) return const SizedBox.shrink();
+
+      return Stack(
+        children: [
+          _fireworkImage(asset, left: 100, top: 65, size: 82, pulse: pulse, phase: 0),
+          _fireworkImage(asset, right: 110, top: 58, size: 88, pulse: pulse, phase: 0.2),
+          _fireworkImage(asset, left: 280, top: 118, size: 64, pulse: pulse, phase: 0.4),
+          _fireworkImage(asset, right: 290, top: 130, size: 64, pulse: pulse, phase: 0.6),
+          _fireworkImage(asset, left: 430, top: 185, size: 54, pulse: pulse, phase: 0.8),
+        ],
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _laserImage({
     double? left,
     double? right,
     required double top,
     required double angle,
+    required double width,
+    required double pulse,
   }) {
+    final asset = _effectAsset();
+    if (asset == null) return const SizedBox.shrink();
+
+    final opacity = 0.72 + math.sin(pulse * math.pi * 2).abs() * 0.24;
+
     return Positioned(
-      top: top,
       left: left,
       right: right,
+      top: top,
       child: Transform.rotate(
         angle: angle,
-        child: Container(
-          width: 230,
-          height: 6,
-          decoration: BoxDecoration(
-            color: const Color(0xFF58E28B).withOpacity(0.75),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF58E28B).withOpacity(0.45),
-                blurRadius: 14,
-                spreadRadius: 2,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: width,
+              height: 14,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(99),
+                color: const Color(0xFF58E28B).withOpacity(0.16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF58E28B).withOpacity(0.45),
+                    blurRadius: 20,
+                    spreadRadius: 3,
+                  ),
+                ],
               ),
-            ],
+            ),
+            Opacity(
+              opacity: opacity.clamp(0.0, 1.0),
+              child: Image.asset(
+                asset,
+                width: width,
+                height: 42,
+                fit: BoxFit.fill,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _droneImage(
+    String asset, {
+    double? left,
+    double? right,
+    required double top,
+    required double size,
+    required double pulse,
+    required double phase,
+  }) {
+    final y = math.sin((pulse + phase) * math.pi * 2) * 8;
+    final angle = math.sin((pulse + phase) * math.pi * 2) * 0.08;
+
+    return Positioned(
+      left: left,
+      right: right,
+      top: top + y,
+      child: Transform.rotate(
+        angle: angle,
+        child: Image.asset(
+          asset,
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+        ),
+      ),
+    );
+  }
+
+  Widget _fireworkImage(
+    String asset, {
+    double? left,
+    double? right,
+    required double top,
+    required double size,
+    required double pulse,
+    required double phase,
+  }) {
+    final local = (pulse + phase) % 1.0;
+    final wave = math.sin(local * math.pi);
+    final scale = 0.82 + wave * 0.22;
+    final opacity = 0.35 + wave * 0.65;
+
+    return Positioned(
+      left: left,
+      right: right,
+      top: top - wave * 8,
+      child: Opacity(
+        opacity: opacity,
+        child: Transform.scale(
+          scale: scale,
+          child: Image.asset(
+            asset,
+            width: size,
+            height: size,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _stageAssetImage({
+    required String asset,
+    required double size,
+    required double pulse,
+    String? label,
+  }) {
+    final scale = 1 + math.sin(pulse * math.pi * 2).abs() * 0.03;
+
+    return Transform.scale(
+      scale: scale,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(
+            asset,
+            width: size,
+            height: size,
+            fit: BoxFit.contain,
+          ),
+          if (label != null)
+            Container(
+              margin: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFDFCF7).withOpacity(0.9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFFD8D0C2),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                label,
+                style: GoogleFonts.caveat(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF2F2F35),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /*
+    AANWIJZING:
+    Crowd bubbles staan nu echt in de crowd/front area.
+    Ze poppen in/out en verdwijnen zodra het probleem is opgelost.
+  */
+  List<String> _stageReactionMessages() {
+    final isOverloaded = _state.currentPowerCapacity > 0 &&
+        _state.totalPowerLoad > _state.currentPowerCapacity;
+
+    if (isOverloaded) {
+      return ['Power overload!', 'Too much power!', 'Stage is risky!'];
+    }
+
+    if (_state.selectedSound != null &&
+        _state.currentSoundDb > _logic.config.soundTargetMax) {
+      return ['Too loud!', 'My ears!', 'Lower sound!'];
+    }
+
+    if (_state.selectedSound != null &&
+        _state.currentSoundDb < _logic.config.soundTargetMin) {
+      return ['Can’t hear it!', 'More sound!'];
+    }
+
+    if (_state.selectedLight != null &&
+        _state.currentLightIntensity > _logic.config.lightTargetMax) {
+      return ['Lights too strong!', 'Too bright!', 'Dim lights!'];
+    }
+
+    if (_state.selectedLight != null &&
+        _state.currentLightIntensity < _logic.config.lightTargetMin) {
+      return ['Too dark!', 'More light!'];
+    }
+
+    if (_state.hasAllSelections) {
+      return ['Nice stage!', 'Looks good!'];
+    }
+
+    if (_state.selectedEffect != null) {
+      return ['Cool effect!'];
+    }
+
+    if (_state.selectedLight != null || _state.selectedSound != null) {
+      return ['Keep tuning!'];
+    }
+
+    return [];
+  }
+
+  Widget _buildCrowdReactionBubbles(double pulse) {
+    final messages = _stageReactionMessages();
+
+    if (messages.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final isBad = messages.first.contains('overload') ||
+        messages.first.contains('Too') ||
+        messages.first.contains('ears') ||
+        messages.first.contains('Lower') ||
+        messages.first.contains('dark') ||
+        messages.first.contains('hear') ||
+        messages.first.contains('risky') ||
+        messages.first.contains('Dim');
+
+    final positions = [
+      _BubblePosition(left: 170, bottom: 90, phase: 0.00),
+      _BubblePosition(right: 170, bottom: 86, phase: 0.28),
+      _BubblePosition(left: 340, bottom: 52, phase: 0.56),
+      _BubblePosition(right: 360, bottom: 54, phase: 0.78),
+    ];
+
+    return Stack(
+      children: [
+        for (int i = 0; i < messages.length && i < positions.length; i++)
+          _buildSingleCrowdBubble(
+            message: messages[i],
+            position: positions[i],
+            pulse: pulse,
+            isBad: isBad,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSingleCrowdBubble({
+    required String message,
+    required _BubblePosition position,
+    required double pulse,
+    required bool isBad,
+  }) {
+    final localPulse = ((pulse + position.phase) % 1.0);
+    final wave = math.sin(localPulse * math.pi);
+    final scale = 0.82 + wave * 0.18;
+    final opacity = 0.35 + wave * 0.65;
+    final yOffset = -wave * 8;
+
+    return Positioned(
+      left: position.left,
+      right: position.right,
+      bottom: position.bottom + yOffset,
+      child: Opacity(
+        opacity: opacity,
+        child: Transform.scale(
+          scale: scale,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isBad
+                  ? const Color(0xFFFFE3DD).withOpacity(0.95)
+                  : const Color(0xFFE8F5D0).withOpacity(0.95),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color:
+                    isBad ? const Color(0xFFD26455) : const Color(0xFF6B9E66),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color:
+                      (isBad ? const Color(0xFFD26455) : const Color(0xFF6B9E66))
+                          .withOpacity(0.16 + wave * 0.10),
+                  blurRadius: 10 + wave * 4,
+                  spreadRadius: 0.4,
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isBad
+                      ? Icons.warning_amber_rounded
+                      : Icons.sentiment_satisfied_alt_rounded,
+                  size: 15,
+                  color:
+                      isBad ? const Color(0xFFD26455) : const Color(0xFF4A7C59),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  message,
+                  style: GoogleFonts.caveat(
+                    fontSize: 18,
+                    height: 0.9,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF2F2F35),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1300,4 +1781,18 @@ class _StageGamePageState extends State<StageGamePage> {
       body: _buildRunningScreen(),
     );
   }
+}
+
+class _BubblePosition {
+  final double? left;
+  final double? right;
+  final double bottom;
+  final double phase;
+
+  const _BubblePosition({
+    this.left,
+    this.right,
+    required this.bottom,
+    required this.phase,
+  });
 }
