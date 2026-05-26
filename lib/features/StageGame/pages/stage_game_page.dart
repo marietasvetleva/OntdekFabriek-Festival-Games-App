@@ -17,6 +17,14 @@ class _StageGamePageState extends State<StageGamePage> {
   final StageGameLogic _logic = StageGameLogic();
   late StageGameState _state;
 
+  /*
+    AANWIJZING:
+    Deze bool voorkomt dat de game meerdere keren naar de final screen gaat.
+    Dit is vooral belangrijk bij power overload, omdat elke keuze opnieuw
+    een check kan doen.
+  */
+  bool _isEndingRound = false;
+
   @override
   void initState() {
     super.initState();
@@ -25,8 +33,66 @@ class _StageGamePageState extends State<StageGamePage> {
     _logic.start(_state);
   }
 
-  Future<void> _finishRound() async {
+  /*
+    AANWIJZING:
+    Nieuwe gameplay-regel:
+    Power overload betekent direct verliezen.
+
+    Waarom?
+    - De rechter speler wordt belangrijker.
+    - De rechter console is niet alleen een dashboard.
+    - De speler moet echt opletten of de stage veilig blijft.
+  */
+  void _checkForInstantPowerFailure() {
+    if (_isEndingRound) return;
+
+    final isOverloaded = _state.currentPowerCapacity > 0 &&
+        _state.totalPowerLoad > _state.currentPowerCapacity;
+
+    if (!isOverloaded) return;
+
+    _triggerPowerOverloadFailure();
+  }
+
+  Future<void> _triggerPowerOverloadFailure() async {
+    if (_isEndingRound) return;
+
     setState(() {
+      _isEndingRound = true;
+    });
+
+    /*
+      AANWIJZING:
+      Kleine delay zodat de speler eerst de overload feedback ziet.
+      Anders voelt het alsof de app ineens weg springt.
+    */
+    await Future.delayed(const Duration(seconds: 7));
+
+    try {
+      await LedService.completeMinigame('stage', 0);
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FinalScreen(
+          sustainabilityScore: 0,
+          stabilityScore: 0,
+          audienceScore: 0,
+          crowdReaction: 'Boo!',
+          endComment: 'Power overload! The stage failed before the show.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _finishRound() async {
+    if (_isEndingRound) return;
+
+    setState(() {
+      _isEndingRound = true;
       _logic.finishRound(_state);
     });
 
@@ -40,7 +106,7 @@ class _StageGamePageState extends State<StageGamePage> {
 
     if (!mounted) return;
 
-    Navigator.push(
+    Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (_) => FinalScreen(
@@ -98,6 +164,12 @@ class _StageGamePageState extends State<StageGamePage> {
     }
   }
 
+  /*
+    AANWIJZING:
+    Deze ChoiceChip methode blijft bestaan voor mobile layout.
+    Voor tablet/wide layout gebruikt de linker speler nu de nieuwe
+    game-controller equipment cards.
+  */
   Widget _buildChoiceWrap<T>({
     required List<T> options,
     required T? selected,
@@ -115,7 +187,7 @@ class _StageGamePageState extends State<StageGamePage> {
         return ChoiceChip(
           label: Text(labelBuilder(option)),
           selected: isSelected,
-          onSelected: (_) => onSelected(option),
+          onSelected: _isEndingRound ? null : (_) => onSelected(option),
           selectedColor: const Color(0xFFE2D5F2),
           backgroundColor: const Color(0xFFFAF8FC),
           visualDensity: VisualDensity.compact,
@@ -147,6 +219,8 @@ class _StageGamePageState extends State<StageGamePage> {
         setState(() {
           _logic.selectSound(_state, option);
         });
+
+        _checkForInstantPowerFailure();
       },
     );
   }
@@ -161,6 +235,8 @@ class _StageGamePageState extends State<StageGamePage> {
         setState(() {
           _logic.selectLight(_state, option);
         });
+
+        _checkForInstantPowerFailure();
       },
     );
   }
@@ -175,6 +251,8 @@ class _StageGamePageState extends State<StageGamePage> {
         setState(() {
           _logic.selectPowerSource(_state, option);
         });
+
+        _checkForInstantPowerFailure();
       },
     );
   }
@@ -189,6 +267,8 @@ class _StageGamePageState extends State<StageGamePage> {
         setState(() {
           _logic.selectEffect(_state, option);
         });
+
+        _checkForInstantPowerFailure();
       },
     );
   }
@@ -249,99 +329,610 @@ class _StageGamePageState extends State<StageGamePage> {
     );
   }
 
-  Widget _buildLeftSideCard({
-    required String title,
-    required Widget child,
-  }) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF2EEF6),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: const Color(0xFFD8D0DF),
-            width: 1.3,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.035),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: RotatedBox(
-          quarterTurns: 1,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-            child: Column(
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.caveat(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    color: const Color(0xFF2F2F35),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: Center(child: child),
-                ),
-              ],
-            ),
-          ),
+  /*
+    AANWIJZING:
+    Nieuwe linker panel versie.
+
+    Wat is veranderd:
+    - Emoji buttons zijn vervangen door Flutter Icons.
+    - Het ziet nu meer uit als een game equipment controller.
+    - Buttons hebben selected glow en betere icon styling.
+    - De categorieën hebben zachte kleuren.
+    - Preset buttons voelen meer als quick build presets.
+    - Left panel blijft 270 breed zodat er geen overflow komt.
+  */
+  Widget _buildPlayerOneConsole(double boardHeight) {
+    const panelWidth = 270.0;
+
+    return SizedBox(
+      width: panelWidth,
+      height: boardHeight,
+      child: RotatedBox(
+        quarterTurns: 1,
+        child: SizedBox(
+          width: boardHeight,
+          height: panelWidth,
+          child: _buildFestivalAssistantPanel(),
         ),
       ),
     );
   }
 
-  Widget _buildPlayerOneConsole(double boardHeight) {
-    return SizedBox(
-      width: 170,
-      height: boardHeight,
+  Widget _buildFestivalAssistantPanel() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      padding: const EdgeInsets.all(9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1EBDD),
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(
+          color: const Color(0xFF2F352F),
+          width: 2.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         children: [
-          _buildLeftSideCard(
-            title: 'Sound',
-            child: _buildSoundOptions(fontSize: 12),
+          Text(
+            'FESTIVAL ASSISTANT',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.caveat(
+              fontSize: 24,
+              height: 0.85,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.4,
+              color: const Color(0xFF2F2F35),
+            ),
           ),
-          _buildLeftSideCard(
-            title: 'Lighting',
-            child: _buildLightOptions(fontSize: 12),
+          const SizedBox(height: 1),
+          Text(
+            'Pick parts for the stage',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.caveat(
+              fontSize: 15,
+              height: 0.9,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF6D6A5C),
+            ),
           ),
-          _buildLeftSideCard(
-            title: 'Power Source',
-            child: _buildPowerOptions(fontSize: 12),
+          const SizedBox(height: 5),
+          const Divider(
+            color: Color(0xFFBEB6A7),
+            thickness: 1.2,
+            height: 1,
           ),
-          _buildLeftSideCard(
-            title: 'Effects',
-            child: _buildEffectOptions(fontSize: 12),
+          const SizedBox(height: 7),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _assistantSectionBox(
+                    title: 'Power',
+                    icon: Icons.bolt_rounded,
+                    accentColor: const Color(0xFFDCA63A),
+                    options: _assistantPowerOptions(),
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: _assistantSectionBox(
+                    title: 'Sound',
+                    icon: Icons.graphic_eq_rounded,
+                    accentColor: const Color(0xFF5B8FA8),
+                    options: _assistantSoundOptions(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 7),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _assistantSectionBox(
+                    title: 'Effects',
+                    icon: Icons.auto_awesome_rounded,
+                    accentColor: const Color(0xFF9A7AB8),
+                    options: _assistantEffectOptions(),
+                  ),
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: _assistantSectionBox(
+                    title: 'Lighting',
+                    icon: Icons.lightbulb_rounded,
+                    accentColor: const Color(0xFFE2B84F),
+                    options: _assistantLightOptions(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 7),
+          const Divider(
+            color: Color(0xFFBEB6A7),
+            thickness: 1,
+            height: 1,
+          ),
+          const SizedBox(height: 5),
+          SizedBox(
+            height: 30,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _presetButton(
+                    icon: Icons.eco_rounded,
+                    label: 'Eco',
+                    color: const Color(0xFF6B9E66),
+                    onTap: _applyEcoPreset,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: _presetButton(
+                    icon: Icons.balance_rounded,
+                    label: 'Balanced',
+                    color: const Color(0xFF5B8FA8),
+                    onTap: _applyBalancedPreset,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: _presetButton(
+                    icon: Icons.local_fire_department_rounded,
+                    label: 'Power',
+                    color: const Color(0xFFD47B4D),
+                    onTap: _applyPerformancePreset,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
+  Widget _assistantSectionBox({
+    required String title,
+    required IconData icon,
+    required Color accentColor,
+    required List<Widget> options,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDDD5C0),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFFC8BFA9),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          /*
+            AANWIJZING:
+            Titel heeft nu een klein icon erbij.
+            Dit maakt elke categorie sneller herkenbaar.
+          */
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 13,
+                color: accentColor,
+              ),
+              const SizedBox(width: 3),
+              Flexible(
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.caveat(
+                    fontSize: 18,
+                    height: 0.85,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF3B3B35),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: Row(
+              children: options.map((option) {
+                return Expanded(child: option);
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _assistantOptionButton({
+    required String label,
+    required IconData icon,
+    required Color accentColor,
+    required Color iconBg,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: _isEndingRound ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 170),
+        curve: Curves.easeOut,
+        margin: const EdgeInsets.symmetric(horizontal: 1.5),
+        padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 1),
+        decoration: BoxDecoration(
+          color: selected ? iconBg : const Color(0xFFFDFCF7),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? accentColor : const Color(0xFFE1DCCB),
+            width: selected ? 1.7 : 1,
+          ),
+          boxShadow: [
+            if (selected)
+              BoxShadow(
+                color: accentColor.withOpacity(0.22),
+                blurRadius: 7,
+                spreadRadius: 0.5,
+              ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            /*
+              AANWIJZING:
+              Flutter icon in plaats van emoji.
+
+              Waarom?
+              - ziet professioneler uit
+              - beter schaalbaar
+              - minder random styling tussen devices
+            */
+            AnimatedScale(
+              scale: selected ? 1.12 : 1,
+              duration: const Duration(milliseconds: 170),
+              curve: Curves.easeOutBack,
+              child: Container(
+                width: 23,
+                height: 23,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? Colors.white.withOpacity(0.65)
+                      : iconBg.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: selected
+                        ? accentColor.withOpacity(0.75)
+                        : const Color(0xFFE0DED5),
+                    width: 1,
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  size: 15,
+                  color: selected ? accentColor : const Color(0xFF5E665C),
+                ),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 8,
+                height: 1,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                color: selected ? const Color(0xFF263524) : const Color(0xFF333333),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _presetButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: _isEndingRound ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 170),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: color.withOpacity(0.55),
+            width: 1,
+          ),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 13,
+                color: color,
+              ),
+              const SizedBox(width: 3),
+              Text(
+                label,
+                style: GoogleFonts.caveat(
+                  fontSize: 14,
+                  height: 0.9,
+                  fontWeight: FontWeight.w900,
+                  color: const Color(0xFF4E4D45),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _assistantPowerOptions() {
+    return [
+      _assistantOptionButton(
+        label: 'Solar',
+        icon: Icons.wb_sunny_rounded,
+        accentColor: const Color(0xFFDCA63A),
+        iconBg: const Color(0xFFFFF1B8),
+        selected: _state.selectedPowerSource == PowerSourceOption.solar,
+        onTap: () {
+          setState(() {
+            _logic.selectPowerSource(_state, PowerSourceOption.solar);
+          });
+          _checkForInstantPowerFailure();
+        },
+      ),
+      _assistantOptionButton(
+        label: 'Hybrid',
+        icon: Icons.bolt_rounded,
+        accentColor: const Color(0xFF6B9E66),
+        iconBg: const Color(0xFFE5F3D6),
+        selected: _state.selectedPowerSource == PowerSourceOption.hybrid,
+        onTap: () {
+          setState(() {
+            _logic.selectPowerSource(_state, PowerSourceOption.hybrid);
+          });
+          _checkForInstantPowerFailure();
+        },
+      ),
+      _assistantOptionButton(
+        label: 'Generator',
+        icon: Icons.factory_rounded,
+        accentColor: const Color(0xFF9A7AB8),
+        iconBg: const Color(0xFFF0E6F5),
+        selected: _state.selectedPowerSource == PowerSourceOption.generator,
+        onTap: () {
+          setState(() {
+            _logic.selectPowerSource(_state, PowerSourceOption.generator);
+          });
+          _checkForInstantPowerFailure();
+        },
+      ),
+    ];
+  }
+
+  List<Widget> _assistantSoundOptions() {
+    return [
+      _assistantOptionButton(
+        label: 'Cheap',
+        icon: Icons.volume_down_rounded,
+        accentColor: const Color(0xFF6B9E66),
+        iconBg: const Color(0xFFE5F3D6),
+        selected: _state.selectedSound == SoundOption.cheap,
+        onTap: () {
+          setState(() {
+            _logic.selectSound(_state, SoundOption.cheap);
+          });
+          _checkForInstantPowerFailure();
+        },
+      ),
+      _assistantOptionButton(
+        label: 'Eco',
+        icon: Icons.eco_rounded,
+        accentColor: const Color(0xFF6B9E66),
+        iconBg: const Color(0xFFE5F3D6),
+        selected: _state.selectedSound == SoundOption.eco,
+        onTap: () {
+          setState(() {
+            _logic.selectSound(_state, SoundOption.eco);
+          });
+          _checkForInstantPowerFailure();
+        },
+      ),
+      _assistantOptionButton(
+        label: 'Pro',
+        icon: Icons.speaker_rounded,
+        accentColor: const Color(0xFF5B8FA8),
+        iconBg: const Color(0xFFDDEFF4),
+        selected: _state.selectedSound == SoundOption.pro,
+        onTap: () {
+          setState(() {
+            _logic.selectSound(_state, SoundOption.pro);
+          });
+          _checkForInstantPowerFailure();
+        },
+      ),
+    ];
+  }
+
+  List<Widget> _assistantEffectOptions() {
+    return [
+      _assistantOptionButton(
+        label: 'Laser',
+        icon: Icons.flash_on_rounded,
+        accentColor: const Color(0xFF5B8FA8),
+        iconBg: const Color(0xFFDDEFF4),
+        selected: _state.selectedEffect == EffectOption.laser,
+        onTap: () {
+          setState(() {
+            _logic.selectEffect(_state, EffectOption.laser);
+          });
+          _checkForInstantPowerFailure();
+        },
+      ),
+      _assistantOptionButton(
+        label: 'Drone',
+        icon: Icons.flight_rounded,
+        accentColor: const Color(0xFF9A7AB8),
+        iconBg: const Color(0xFFF0E6F5),
+        selected: _state.selectedEffect == EffectOption.drone,
+        onTap: () {
+          setState(() {
+            _logic.selectEffect(_state, EffectOption.drone);
+          });
+          _checkForInstantPowerFailure();
+        },
+      ),
+      _assistantOptionButton(
+        label: 'Firework',
+        icon: Icons.auto_awesome_rounded,
+        accentColor: const Color(0xFFD47B4D),
+        iconBg: const Color(0xFFFBE4D3),
+        selected: _state.selectedEffect == EffectOption.fireworks,
+        onTap: () {
+          setState(() {
+            _logic.selectEffect(_state, EffectOption.fireworks);
+          });
+          _checkForInstantPowerFailure();
+        },
+      ),
+    ];
+  }
+
+  List<Widget> _assistantLightOptions() {
+    return [
+      _assistantOptionButton(
+        label: 'LED',
+        icon: Icons.lightbulb_rounded,
+        accentColor: const Color(0xFFE2B84F),
+        iconBg: const Color(0xFFFFF1B8),
+        selected: _state.selectedLight == LightOption.led,
+        onTap: () {
+          setState(() {
+            _logic.selectLight(_state, LightOption.led);
+          });
+          _checkForInstantPowerFailure();
+        },
+      ),
+      _assistantOptionButton(
+        label: 'Smart',
+        icon: Icons.memory_rounded,
+        accentColor: const Color(0xFF5B8FA8),
+        iconBg: const Color(0xFFDDEFF4),
+        selected: _state.selectedLight == LightOption.smart,
+        onTap: () {
+          setState(() {
+            _logic.selectLight(_state, LightOption.smart);
+          });
+          _checkForInstantPowerFailure();
+        },
+      ),
+      _assistantOptionButton(
+        label: 'Halogen',
+        icon: Icons.local_fire_department_rounded,
+        accentColor: const Color(0xFFD47B4D),
+        iconBg: const Color(0xFFFBE4D3),
+        selected: _state.selectedLight == LightOption.halogen,
+        onTap: () {
+          setState(() {
+            _logic.selectLight(_state, LightOption.halogen);
+          });
+          _checkForInstantPowerFailure();
+        },
+      ),
+    ];
+  }
+
+  void _applyEcoPreset() {
+    if (_isEndingRound) return;
+
+    setState(() {
+      _logic.selectPowerSource(_state, PowerSourceOption.solar);
+      _logic.selectSound(_state, SoundOption.eco);
+      _logic.selectLight(_state, LightOption.led);
+      _logic.selectEffect(_state, EffectOption.laser);
+    });
+
+    _checkForInstantPowerFailure();
+  }
+
+  void _applyBalancedPreset() {
+    if (_isEndingRound) return;
+
+    setState(() {
+      _logic.selectPowerSource(_state, PowerSourceOption.hybrid);
+      _logic.selectSound(_state, SoundOption.eco);
+      _logic.selectLight(_state, LightOption.smart);
+      _logic.selectEffect(_state, EffectOption.drone);
+    });
+
+    _checkForInstantPowerFailure();
+  }
+
+  void _applyPerformancePreset() {
+    if (_isEndingRound) return;
+
+    setState(() {
+      _logic.selectPowerSource(_state, PowerSourceOption.generator);
+      _logic.selectSound(_state, SoundOption.pro);
+      _logic.selectLight(_state, LightOption.halogen);
+      _logic.selectEffect(_state, EffectOption.fireworks);
+    });
+
+    _checkForInstantPowerFailure();
+  }
+
   Widget _buildPlayerTwoConsole(double boardHeight) {
     /*
-      AANPASSING:
-      455 was net te smal voor de nieuwe image-assets.
-      480 geeft de rechter panel iets meer ademruimte,
-      zodat de meters en teksten minder clippen.
+      AANWIJZING:
+      Right panel blijft kleiner.
+
+      Eerst: 500
+      Nu: 455
+
+      Waarom?
+      - left panel heeft iets meer ruimte nodig.
+      - stage blijft nog steeds groot genoeg.
+      - right panel voelt minder zwaar/dashboard-achtig.
     */
-    const panelWidth = 550.0;
+    const panelWidth = 455.0;
 
     return SizedBox(
       width: panelWidth,
       height: boardHeight,
-
-      /*
-        BELANGRIJK:
-        quarterTurns: 3 is de juiste kijkrichting voor de rechterspeler.
-        Niet veranderen, anders draait de panel weer verkeerd.
-      */
       child: RotatedBox(
         quarterTurns: 3,
         child: SizedBox(
@@ -592,7 +1183,7 @@ class _StageGamePageState extends State<StageGamePage> {
   }
 
   Widget _buildFinishButton() {
-    final canFinish = _logic.canFinish(_state);
+    final canFinish = _logic.canFinish(_state) && !_isEndingRound;
 
     return Padding(
       padding: const EdgeInsets.only(right: 16),
@@ -614,7 +1205,11 @@ class _StageGamePageState extends State<StageGamePage> {
             ),
           ),
           child: Text(
-            canFinish ? 'Finish Round' : 'Choose all parts',
+            _isEndingRound
+                ? 'Stage Failed'
+                : canFinish
+                    ? 'Finish Round'
+                    : 'Choose all parts',
             style: GoogleFonts.caveat(
               fontSize: 22,
               fontWeight: FontWeight.w900,
@@ -646,11 +1241,11 @@ class _StageGamePageState extends State<StageGamePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildPlayerOneConsole(boardHeight),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: _buildStageVisualArea(boardHeight),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 10),
                       _buildPlayerTwoConsole(boardHeight),
                     ],
                   ),
