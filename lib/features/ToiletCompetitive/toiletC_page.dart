@@ -3,8 +3,13 @@ import 'dart:math';
 import 'dart:ui' show lerpDouble;
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'toiletC_arena_layout.dart';
+import 'toiletC_arena_layout_editor.dart';
+import 'toiletC_arena_layout_tune.dart';
+import 'toiletC_arena_scene.dart';
 import 'toiletC_logic.dart';
 import 'toiletC_models.dart';
 import 'toiletC_movement.dart';
@@ -350,11 +355,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   static const double _itemStartSize = 148;
   static const double _spawnPopDurationSec = 0.24;
   static const double _spawnStartScale = 0.72;
-  static const double _bucketWidth = 200;
-  static const double _bucketHeight = 160;
-  static const double _bucketAspect = _bucketWidth / _bucketHeight;
-  static const double _arenaSideGapMin = 6;
-
   static const String _bucketAssetLeft = 'assets/ToiletCompetitive/bucket_left.png';
   static const String _bucketAssetRight = 'assets/ToiletCompetitive/bucket_right.png';
   static const String _sfxGoodCatch =
@@ -380,10 +380,17 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   bool _p1Ready = false;
   bool _p2Ready = false;
   int? _countdown;
+  ArenaLayoutTune? _layoutTune;
+  bool _layoutEditorEnabled = false;
+
+  /// Hot-reload on web can leave this unset when State fields change.
+  ArenaLayoutTune get _effectiveLayoutTune =>
+      _layoutTune ??= ArenaLayoutTune.defaults();
 
   @override
   void initState() {
     super.initState();
+    _layoutTune = ArenaLayoutTune.defaults();
     _gameState = _logic.createInitialState();
   }
 
@@ -750,60 +757,22 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
   }
 
-  Size _bucketSize(Size screen) {
-    final shortestSide = min(screen.width, screen.height);
-    final height = (shortestSide * 0.33).clamp(140.0, 300.0).toDouble();
-    final width = height * _bucketAspect;
-    return Size(width, height);
+  Rect _playArea(Size size) => ToiletCompetitiveArenaLayout.playArea(size);
+
+  Rect _playerBucketRect({required Size size, required int player}) {
+    return ToiletCompetitiveArenaLayout.playerBucketRect(
+      screen: size,
+      player: player,
+      tune: _effectiveLayoutTune,
+    );
   }
 
-  double _arenaSideGap(Size screen) {
-    return max(_arenaSideGapMin, screen.width * 0.01);
-  }
-
-  Rect _playArea(Size size) {
-    final bucket = _bucketSize(size);
-    final gap = _arenaSideGap(size);
-
-    final sideInset = bucket.width * 0.88 + gap;
-    final left = sideInset;
-    final right = size.width - sideInset;
-    final arenaWidth = max(0.0, right - left);
-
-    final arenaHeight = size.height * 0.66;
-    final top = size.height * 0.18;
-
-    return Rect.fromLTWH(left, top, arenaWidth, arenaHeight);
-  }
-
-  Rect _playerBucketRect({
-    required Size size,
-    required Rect playArea,
-    required int player,
-  }) {
-    final bucket = _bucketSize(size);
-    final height = bucket.height;
-    final width = bucket.width;
-    final edgeOverflow = min(18.0, width * 0.10);
-
-    final centerY = playArea.center.dy;
-    final y = (centerY - height / 2).clamp(0.0, size.height - height);
-
-    if (player == 1) {
-      return Rect.fromLTWH(-edgeOverflow, y, width, height);
-    }
-
-    return Rect.fromLTWH(size.width - width + edgeOverflow, y, width, height);
-  }
-
-  Rect _bucketCatchRect(Rect bucketRect) {
-    final catchWidth = bucketRect.width * 0.15;
-    final catchHeight = bucketRect.height * 0.12;
-
-    final left = bucketRect.left + (bucketRect.width - catchWidth) / 2;
-    final top = bucketRect.top + bucketRect.height * 0.40;
-
-    return Rect.fromLTWH(left, top, catchWidth, catchHeight);
+  Rect _bucketCatchRect(Rect bucketRect, int player) {
+    return ToiletCompetitiveArenaLayout.bucketCatchRect(
+      bucketRect,
+      player,
+      _effectiveLayoutTune,
+    );
   }
 
   double _itemArtScaleForType(CompetitiveItemType type) {
@@ -1043,11 +1012,10 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final player = _pointerOwnerById.remove(pointerId);
     if (player == null) return;
 
-    final playArea = _playArea(size);
-    final p1Bucket = _playerBucketRect(size: size, playArea: playArea, player: 1);
-    final p2Bucket = _playerBucketRect(size: size, playArea: playArea, player: 2);
-    final p1CatchRect = _bucketCatchRect(p1Bucket);
-    final p2CatchRect = _bucketCatchRect(p2Bucket);
+    final p1Bucket = _playerBucketRect(size: size, player: 1);
+    final p2Bucket = _playerBucketRect(size: size, player: 2);
+    final p1CatchRect = _bucketCatchRect(p1Bucket, 1);
+    final p2CatchRect = _bucketCatchRect(p2Bucket, 2);
 
     for (final spawn in _gameState.activeItems.toList()) {
       final layout = _layouts[spawn.id];
@@ -1732,8 +1700,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final playArea = _playArea(size);
-    final p1Bucket = _playerBucketRect(size: size, playArea: playArea, player: 1);
-    final p2Bucket = _playerBucketRect(size: size, playArea: playArea, player: 2);
+    final p1Bucket = _playerBucketRect(size: size, player: 1);
+    final p2Bucket = _playerBucketRect(size: size, player: 2);
     final p1 = _gameState.players[CompetitivePlayerId.p1]!;
     final p2 = _gameState.players[CompetitivePlayerId.p2]!;
     final timeLeft = _logic.timeLeftSec(_gameState);
@@ -1805,124 +1773,87 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       );
     }
 
+    final gameStack = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ToiletCompetitiveArenaScene(
+          screenSize: size,
+          p1Bucket: p1Bucket,
+          p2Bucket: p2Bucket,
+          p1Score: p1.score,
+          p2Score: p2.score,
+          p1BinType: p1.binType,
+          p2BinType: p2.binType,
+          bucketAssetLeft: _bucketAssetLeft,
+          bucketAssetRight: _bucketAssetRight,
+          binTintFor: _binTintFor,
+          scoreBadge: _scoreBadge,
+          layoutTune: _effectiveLayoutTune,
+        ),
+        Positioned(
+          left: 8,
+          top: max(8.0, playArea.top - 8),
+          child: _tickets(p1.lives, p1.binType, fallLeft: true),
+        ),
+        Positioned(
+          right: 8,
+          top: max(8.0, playArea.top - 8),
+          child: _tickets(p2.lives, p2.binType, fallLeft: false),
+        ),
+        Positioned(
+          top: max(12.0, playArea.top - timerDiameter - 12),
+          left: 0,
+          right: 0,
+          child: Center(
+            child: _binTimerPuck(
+              progress: timerProgress,
+              secsLeft: secsLeft,
+              diameter: timerDiameter,
+            ),
+          ),
+        ),
+        ..._itemWidgets(),
+        ..._depositFxWidgets(),
+        if (kDebugMode && _layoutEditorEnabled)
+          ToiletCompetitiveLayoutEditor(
+            screenSize: size,
+            tune: _effectiveLayoutTune,
+            onTuneChanged: (t) => setState(() => _layoutTune = t),
+            onClose: () => setState(() => _layoutEditorEnabled = false),
+          ),
+        if (kDebugMode)
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: ToiletCompetitiveLayoutEditorFab(
+              enabled: _layoutEditorEnabled,
+              onToggle: () => setState(
+                () => _layoutEditorEnabled = !_layoutEditorEnabled,
+              ),
+            ),
+          ),
+      ],
+    );
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F4F1),
       body: SafeArea(
-        child: Listener(
-          behavior: HitTestBehavior.opaque,
-          onPointerDown: (event) => _onPointerDown(event, size),
-          onPointerMove: (event) => _onPointerMove(event, size),
-          onPointerUp: (event) => _releaseDraggedItems(
-            pointerId: event.pointer,
-            size: size,
-          ),
-          onPointerCancel: (event) => _releaseDraggedItems(
-            pointerId: event.pointer,
-            size: size,
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Container(
-                  color: const Color(0xFFF1F0EA),
+        child: _layoutEditorEnabled
+            ? gameStack
+            : Listener(
+                behavior: HitTestBehavior.opaque,
+                onPointerDown: (event) => _onPointerDown(event, size),
+                onPointerMove: (event) => _onPointerMove(event, size),
+                onPointerUp: (event) => _releaseDraggedItems(
+                  pointerId: event.pointer,
+                  size: size,
                 ),
-              ),
-              Positioned(
-                left: 20,
-                top: 12,
-                child: _tickets(p1.lives, p1.binType, fallLeft: true),
-              ),
-              Positioned(
-                right: 20,
-                top: 12,
-                child: _tickets(p2.lives, p2.binType, fallLeft: false),
-              ),
-              Positioned(
-                top: max(18.0, playArea.top - timerDiameter - 50.0),
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: _binTimerPuck(
-                    progress: timerProgress,
-                    secsLeft: secsLeft,
-                    diameter: timerDiameter,
-                  ),
+                onPointerCancel: (event) => _releaseDraggedItems(
+                  pointerId: event.pointer,
+                  size: size,
                 ),
+                child: gameStack,
               ),
-              Positioned.fromRect(
-                rect: playArea,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCEBD8).withAlpha(128),
-                      border: Border.all(
-                        color: const Color(0xFFB8CBB7),
-                        width: 2,
-                      ),
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    child: const SizedBox.expand(),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: p1Bucket.left,
-                top: p1Bucket.top,
-                child: SizedBox(
-                  width: p1Bucket.width,
-                  height: p1Bucket.height,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      _imageOrFallback(
-                        path: _bucketAssetLeft,
-                        width: p1Bucket.width,
-                        height: p1Bucket.height,
-                        fallbackColor: _binTintFor(p1.binType),
-                        fit: BoxFit.contain,
-                        alignment: Alignment.bottomCenter,
-                        flipX: false,
-                      ),
-                      RotatedBox(
-                        quarterTurns: 1,
-                        child: _scoreBadge(p1.score, _binTintFor(p1.binType)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: p2Bucket.left,
-                top: p2Bucket.top,
-                child: SizedBox(
-                  width: p2Bucket.width,
-                  height: p2Bucket.height,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      _imageOrFallback(
-                        path: _bucketAssetRight,
-                        width: p2Bucket.width,
-                        height: p2Bucket.height,
-                        fallbackColor: _binTintFor(p2.binType),
-                        fit: BoxFit.contain,
-                        alignment: Alignment.bottomCenter,
-                        flipX: false,
-                      ),
-                      RotatedBox(
-                        quarterTurns: 3,
-                        child: _scoreBadge(p2.score, _binTintFor(p2.binType)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              ..._itemWidgets(),
-              ..._depositFxWidgets(),
-            ],
-          ),
-        ),
       ),
     );
   }
