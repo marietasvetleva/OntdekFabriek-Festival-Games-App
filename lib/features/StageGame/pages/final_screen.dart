@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../services/stage_audio_service.dart';
 import 'splash_screen.dart';
 
-class FinalScreen extends StatelessWidget {
+class FinalScreen extends StatefulWidget {
   final int sustainabilityScore;
   final int stabilityScore;
   final int audienceScore;
@@ -17,6 +19,53 @@ class FinalScreen extends StatelessWidget {
     required this.crowdReaction,
     required this.endComment,
   });
+
+  @override
+  State<FinalScreen> createState() => _FinalScreenState();
+}
+
+class _FinalScreenState extends State<FinalScreen> {
+  final StageAudioService _audioService = StageAudioService();
+
+  bool _soundPlayed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _playResultSound();
+  }
+
+  Future<void> _playResultSound() async {
+    await _audioService.init();
+
+    if (!mounted || _soundPlayed) return;
+
+    _soundPlayed = true;
+
+    await Future.delayed(const Duration(milliseconds: 250));
+
+    if (!mounted) return;
+
+    final reaction = widget.crowdReaction.toLowerCase();
+    final comment = widget.endComment.toLowerCase();
+
+    final isBadResult = reaction.contains('boo') ||
+        comment.contains('failed') ||
+        comment.contains('overload') ||
+        widget.audienceScore < 50;
+
+    if (isBadResult) {
+      _audioService.playCrowdBoo();
+    } else {
+      _audioService.playCrowdCheer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _audioService.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +124,7 @@ class FinalScreen extends StatelessWidget {
                       child: Column(
                         children: [
                           Text(
-                            crowdReaction,
+                            widget.crowdReaction,
                             style: GoogleFonts.caveat(
                               fontSize: 52,
                               fontWeight: FontWeight.w900,
@@ -86,7 +135,7 @@ class FinalScreen extends StatelessWidget {
                           const SizedBox(height: 12),
 
                           Text(
-                            endComment,
+                            widget.endComment,
                             textAlign: TextAlign.center,
                             style: GoogleFonts.caveat(
                               fontSize: 28,
@@ -99,21 +148,21 @@ class FinalScreen extends StatelessWidget {
 
                           _ScoreRow(
                             label: 'Sustainability Score',
-                            value: sustainabilityScore,
+                            value: widget.sustainabilityScore,
                           ),
 
                           const SizedBox(height: 12),
 
                           _ScoreRow(
                             label: 'Stability Score',
-                            value: stabilityScore,
+                            value: widget.stabilityScore,
                           ),
 
                           const SizedBox(height: 12),
 
                           _ScoreRow(
                             label: 'Audience Satisfaction',
-                            value: audienceScore,
+                            value: widget.audienceScore,
                           ),
                         ],
                       ),

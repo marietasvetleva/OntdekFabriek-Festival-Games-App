@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../logic/stage_game_models.dart';
 import 'stage_panel_status.dart';
 
@@ -8,10 +9,20 @@ class StageRightPanel extends StatefulWidget {
   final StageGameState state;
   final StageGameConfig config;
 
+  final void Function(StageControlLevel level)? onSoundLevelChanged;
+  final void Function(StageControlLevel level)? onLightLevelChanged;
+
+  final void Function(double progress)? onSoundSliderProgressChanged;
+  final void Function(double progress)? onLightSliderProgressChanged;
+
   const StageRightPanel({
     super.key,
     required this.state,
     required this.config,
+    this.onSoundLevelChanged,
+    this.onLightLevelChanged,
+    this.onSoundSliderProgressChanged,
+    this.onLightSliderProgressChanged,
   });
 
   @override
@@ -24,19 +35,31 @@ class _StageRightPanelState extends State<StageRightPanel>
 
   late final AnimationController _loopController;
 
+  double _soundSliderProgress = 0.5;
+  double _lightSliderProgress = 0.0;
+
+  bool _isDraggingSound = false;
+  bool _isDraggingLight = false;
+
+  StageControlLevel? _lastSoundLevelSent;
+  StageControlLevel? _lastLightLevelSent;
+
+  StageControlLevel? _pendingSoundLevel;
+  StageControlLevel? _pendingLightLevel;
+
   @override
   void initState() {
     super.initState();
 
-    /*
-      AANWIJZING:
-      Deze controller maakt de rechter console levendiger:
-      - kleine scan-line over actieve cards
-      - meter knob pulse
-      - icon pulse
-      - feedback glow
-      - ready sparkles
-    */
+    _soundSliderProgress = _progressFromLevel(widget.state.soundControlLevel);
+    _lightSliderProgress = _lightProgressFromState();
+
+    _lastSoundLevelSent = widget.state.soundControlLevel;
+    _lastLightLevelSent = widget.state.lightControlLevel;
+
+    _pendingSoundLevel = widget.state.soundControlLevel;
+    _pendingLightLevel = widget.state.lightControlLevel;
+
     _loopController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1600),
@@ -44,9 +67,133 @@ class _StageRightPanelState extends State<StageRightPanel>
   }
 
   @override
+  void didUpdateWidget(StageRightPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (!_isDraggingSound &&
+        oldWidget.state.soundControlLevel != widget.state.soundControlLevel) {
+      _soundSliderProgress = _progressFromLevel(widget.state.soundControlLevel);
+      _lastSoundLevelSent = widget.state.soundControlLevel;
+      _pendingSoundLevel = widget.state.soundControlLevel;
+    }
+
+    if (!_isDraggingLight &&
+        (oldWidget.state.lightControlLevel != widget.state.lightControlLevel ||
+            oldWidget.state.selectedLight != widget.state.selectedLight)) {
+      _lightSliderProgress = _lightProgressFromState();
+      _lastLightLevelSent = widget.state.lightControlLevel;
+      _pendingLightLevel = widget.state.lightControlLevel;
+    }
+  }
+
+  @override
   void dispose() {
     _loopController.dispose();
     super.dispose();
+  }
+
+  double _progressFromLevel(StageControlLevel level) {
+    switch (level) {
+      case StageControlLevel.low:
+        return 0.0;
+      case StageControlLevel.medium:
+        return 0.5;
+      case StageControlLevel.high:
+        return 1.0;
+    }
+  }
+
+  double _lightProgressFromState() {
+    if (widget.state.selectedLight == null) {
+      return 0.0;
+    }
+
+    return _progressFromLevel(widget.state.lightControlLevel);
+  }
+
+  StageControlLevel _levelFromProgress(double progress) {
+    if (progress < 0.34) {
+      return StageControlLevel.low;
+    }
+
+    if (progress < 0.67) {
+      return StageControlLevel.medium;
+    }
+
+    return StageControlLevel.high;
+  }
+
+  int _selectedSpeakerMaxDb() {
+    switch (widget.state.selectedSound) {
+      case SoundOption.cheap:
+        return 75;
+      case SoundOption.eco:
+        return 98;
+      case SoundOption.pro:
+        return 110;
+      default:
+        return 100;
+    }
+  }
+
+  String _soundTargetText() {
+    switch (widget.state.selectedSound) {
+      case SoundOption.cheap:
+        return 'Cheap max: 75 dB • High distorts';
+      case SoundOption.eco:
+        return 'Eco max: 98 dB • Clean and stable';
+      case SoundOption.pro:
+        return 'Pro max: 110 dB • Festival power';
+      default:
+        return 'Choose speaker • Drag meter';
+    }
+  }
+
+  String _soundLowLabel() {
+    return '0';
+  }
+
+  String _soundHighLabel() {
+    return '${_selectedSpeakerMaxDb()} dB';
+  }
+
+  String _soundMainText() {
+    if (widget.state.selectedSound == SoundOption.cheap &&
+        widget.state.soundControlLevel == StageControlLevel.high) {
+      return 'Speaker Distortion';
+    }
+
+    return 'Sound (dB)';
+  }
+
+  String _lightTargetText() {
+    if (widget.state.selectedLight == null) {
+      return 'Choose a light first';
+    }
+
+    switch (widget.state.selectedLight) {
+      case LightOption.led:
+        return 'LED light • Drag meter';
+      case LightOption.smart:
+        return 'Smart light • Drag meter';
+      case LightOption.halogen:
+        return 'Halogen light • Drag meter';
+      default:
+        return 'Choose a light first';
+    }
+  }
+
+  String _lightHighLabel() {
+    switch (widget.state.selectedLight) {
+      case LightOption.led:
+        return '82';
+      case LightOption.smart:
+        return '85';
+      case LightOption.halogen:
+        return '94';
+      default:
+        return 'max';
+    }
   }
 
   @override
@@ -74,6 +221,8 @@ class _StageRightPanelState extends State<StageRightPanel>
       widget.config,
     );
 
+    final bool hasLightSelected = widget.state.selectedLight != null;
+
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -86,26 +235,6 @@ class _StageRightPanelState extends State<StageRightPanel>
           width: 2.4,
         ),
       ),
-
-      /*
-        BELANGRIJKE AANWIJZING:
-
-        StageGamePage draait deze hele panel met:
-        RotatedBox(quarterTurns: 3)
-
-        Daarom is deze volgorde expres:
-        1. STAGE BUILDER
-        2. POWER MANAGEMENT
-        3. LIGHT CONTROL
-        4. SOUND CONTROL
-        5. FEEDBACK / COMMAND BOX
-
-        Nieuwe fix:
-        - Rechter panel is nu smaller in StageGamePage.
-        - Daarom zijn iconen, label boxen en feedback kleiner gemaakt.
-        - Dit zorgt dat het niet meer voelt als groot dashboard.
-        - De controls blijven leesbaar maar pakken minder ruimte.
-      */
       child: Column(
         children: [
           SizedBox(
@@ -115,8 +244,7 @@ class _StageRightPanelState extends State<StageRightPanel>
           const SizedBox(height: 7),
           Expanded(
             child: _buildControlCard(
-              cardKey:
-                  'power-${widget.state.totalPowerLoad}-${widget.state.currentPowerCapacity}-$powerStatus',
+              cardKey: 'power-card',
               title: 'POWER\nMANAGEMENT',
               icon: Icons.bolt_rounded,
               meterTrackPath: '$_assetBase/meter_track_power.png',
@@ -129,61 +257,62 @@ class _StageRightPanelState extends State<StageRightPanel>
               highLabel: 'max',
               progress: _powerProgress(),
               status: powerStatus,
+              meterType: _MeterType.power,
             ),
           ),
           const SizedBox(height: 7),
           Expanded(
             child: _buildControlCard(
               cardKey:
-                  'light-${widget.state.currentLightIntensity}-$lightStatus',
+                  'light-card-${widget.state.selectedLight}-${widget.state.lightControlLevel}',
               title: 'LIGHT\nCONTROL',
-              icon: Icons.lightbulb_outline_rounded,
+              icon: hasLightSelected
+                  ? Icons.lightbulb_outline_rounded
+                  : Icons.lightbulb_outline,
               meterTrackPath: '$_assetBase/meter_track_light.png',
-              mainText: 'Light Intensity',
-              valueText: widget.state.currentLightIntensity <= 0
+              mainText: hasLightSelected ? 'Light Intensity' : 'Choose Light',
+              valueText: !hasLightSelected ||
+                      widget.state.currentLightIntensity <= 0
                   ? '-'
                   : widget.state.currentLightIntensity.toStringAsFixed(0),
-              targetText:
-                  'Target: ${widget.config.lightTargetMin.toStringAsFixed(0)}-${widget.config.lightTargetMax.toStringAsFixed(0)}',
-              lowLabel: 'low',
-              highLabel: 'high',
-              progress: _lightProgress(),
-              status: lightStatus,
+              targetText: _lightTargetText(),
+              lowLabel: '0',
+              highLabel: _lightHighLabel(),
+              progress: hasLightSelected ? _lightSliderProgress : 0.0,
+              status: hasLightSelected ? lightStatus : StagePanelStatus.neutral,
+              meterType: _MeterType.light,
+              onMeterLevelChanged:
+                  hasLightSelected ? widget.onLightLevelChanged : null,
+              onSliderProgressChanged:
+                  hasLightSelected ? widget.onLightSliderProgressChanged : null,
             ),
           ),
           const SizedBox(height: 7),
           Expanded(
             child: _buildControlCard(
-              cardKey: 'sound-${widget.state.currentSoundDb}-$soundStatus',
+              cardKey:
+                  'sound-card-${widget.state.selectedSound}-${widget.state.soundControlLevel}',
               title: 'SOUND\nCONTROL',
-              icon: Icons.volume_up_rounded,
+              icon: widget.state.selectedSound == SoundOption.cheap &&
+                      widget.state.soundControlLevel == StageControlLevel.high
+                  ? Icons.warning_rounded
+                  : Icons.volume_up_rounded,
               meterTrackPath: '$_assetBase/meter_track_sound.png',
-              mainText: 'Sound (dB)',
+              mainText: _soundMainText(),
               valueText: widget.state.currentSoundDb <= 0
                   ? '- dB'
                   : '${widget.state.currentSoundDb.toStringAsFixed(0)} dB',
-              targetText:
-                  'Target: ${widget.config.soundTargetMin.toStringAsFixed(0)}-${widget.config.soundTargetMax.toStringAsFixed(0)} dB',
-              lowLabel: '0',
-              highLabel: '100 dB',
-              progress: _soundProgress(),
+              targetText: _soundTargetText(),
+              lowLabel: _soundLowLabel(),
+              highLabel: _soundHighLabel(),
+              progress: _soundSliderProgress,
               status: soundStatus,
+              meterType: _MeterType.sound,
+              onMeterLevelChanged: widget.onSoundLevelChanged,
+              onSliderProgressChanged: widget.onSoundSliderProgressChanged,
             ),
           ),
           const SizedBox(height: 7),
-
-          /*
-            AANWIJZING:
-            Feedback box is kleiner gemaakt.
-
-            Eerst: 78
-            Nu: 64
-
-            Waarom?
-            - Rechter panel is smaller geworden.
-            - Feedback hoeft niet zo veel ruimte te pakken.
-            - Hierdoor krijgen de meters meer ademruimte.
-          */
           SizedBox(
             height: 64,
             child: _buildFeedbackBar(
@@ -251,6 +380,9 @@ class _StageRightPanelState extends State<StageRightPanel>
     required String highLabel,
     required double progress,
     required StagePanelStatus status,
+    required _MeterType meterType,
+    void Function(StageControlLevel level)? onMeterLevelChanged,
+    void Function(double progress)? onSliderProgressChanged,
   }) {
     final statusColor = StagePanelStatusHelper.statusColor(status);
     final cardBackground = StagePanelStatusHelper.cardBackground(status);
@@ -352,6 +484,9 @@ class _StageRightPanelState extends State<StageRightPanel>
                   progress: progress,
                   meterTrackPath: meterTrackPath,
                   status: status,
+                  meterType: meterType,
+                  onMeterLevelChanged: onMeterLevelChanged,
+                  onSliderProgressChanged: onSliderProgressChanged,
                 ),
               ),
             ],
@@ -438,15 +573,6 @@ class _StageRightPanelState extends State<StageRightPanel>
             status == StagePanelStatus.neutral ? 1.0 : 1.0 + (pulse * 0.05);
 
         return Container(
-          /*
-            AANWIJZING:
-            Label box kleiner gemaakt.
-
-            Eerst: 118
-            Nu: 100
-
-            Hierdoor passen de meters beter in het smallere right panel.
-          */
           width: 100,
           height: double.infinity,
           padding: const EdgeInsets.symmetric(
@@ -473,13 +599,6 @@ class _StageRightPanelState extends State<StageRightPanel>
                     scale: iconScale,
                     child: Icon(
                       icon,
-                      /*
-                        AANWIJZING:
-                        Icon kleiner gemaakt.
-
-                        Eerst: 31
-                        Nu: 25
-                      */
                       size: 25,
                       color: status == StagePanelStatus.warning
                           ? statusColor
@@ -502,13 +621,6 @@ class _StageRightPanelState extends State<StageRightPanel>
                       title,
                       textAlign: TextAlign.center,
                       style: GoogleFonts.caveat(
-                        /*
-                          AANWIJZING:
-                          Control label font kleiner gemaakt.
-
-                          Eerst: 20
-                          Nu: 17
-                        */
                         fontSize: 17,
                         height: 0.84,
                         fontWeight: FontWeight.w900,
@@ -572,6 +684,9 @@ class _StageRightPanelState extends State<StageRightPanel>
     required double progress,
     required String meterTrackPath,
     required StagePanelStatus status,
+    required _MeterType meterType,
+    void Function(StageControlLevel level)? onMeterLevelChanged,
+    void Function(double progress)? onSliderProgressChanged,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -597,6 +712,9 @@ class _StageRightPanelState extends State<StageRightPanel>
                   progress: progress,
                   meterTrackPath: meterTrackPath,
                   status: status,
+                  meterType: meterType,
+                  onMeterLevelChanged: onMeterLevelChanged,
+                  onSliderProgressChanged: onSliderProgressChanged,
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -604,7 +722,7 @@ class _StageRightPanelState extends State<StageRightPanel>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.caveat(
-                    fontSize: 16,
+                    fontSize: onMeterLevelChanged == null ? 16 : 14,
                     height: 0.9,
                     fontWeight: FontWeight.w800,
                     color: const Color(0xFF63655E),
@@ -684,6 +802,9 @@ class _StageRightPanelState extends State<StageRightPanel>
     required double progress,
     required String meterTrackPath,
     required StagePanelStatus status,
+    required _MeterType meterType,
+    void Function(StageControlLevel level)? onMeterLevelChanged,
+    void Function(double progress)? onSliderProgressChanged,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -710,11 +831,14 @@ class _StageRightPanelState extends State<StageRightPanel>
             progress: progress,
             meterTrackPath: meterTrackPath,
             status: status,
+            meterType: meterType,
+            onMeterLevelChanged: onMeterLevelChanged,
+            onSliderProgressChanged: onSliderProgressChanged,
           ),
         ),
         const SizedBox(width: 2),
         SizedBox(
-          width: 40,
+          width: 48,
           child: FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerRight,
@@ -737,18 +861,82 @@ class _StageRightPanelState extends State<StageRightPanel>
     required double progress,
     required String meterTrackPath,
     required StagePanelStatus status,
+    required _MeterType meterType,
+    void Function(StageControlLevel level)? onMeterLevelChanged,
+    void Function(double progress)? onSliderProgressChanged,
   }) {
     final safeProgress = progress.clamp(0.0, 1.0);
+    final isDraggable = onMeterLevelChanged != null &&
+        (meterType == _MeterType.sound || meterType == _MeterType.light);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         const knobWidth = 20.0;
         const knobHeight = 28.0;
 
-        final knobLeft = ((constraints.maxWidth - knobWidth) * safeProgress)
-            .clamp(0.0, constraints.maxWidth - knobWidth);
+        final usableWidth =
+            math.max(1.0, constraints.maxWidth - knobWidth).toDouble();
 
-        return AnimatedBuilder(
+        final knobLeft = (usableWidth * safeProgress).clamp(0.0, usableWidth);
+
+        void updateFromDx(double dx) {
+          if (!isDraggable) return;
+
+          final newProgress =
+              ((dx - knobWidth / 2) / usableWidth).clamp(0.0, 1.0);
+
+          final newLevel = _levelFromProgress(newProgress);
+
+          setState(() {
+            if (meterType == _MeterType.sound) {
+              _isDraggingSound = true;
+              _soundSliderProgress = newProgress;
+              _pendingSoundLevel = newLevel;
+            }
+
+            if (meterType == _MeterType.light) {
+              _isDraggingLight = true;
+              _lightSliderProgress = newProgress;
+              _pendingLightLevel = newLevel;
+            }
+          });
+
+          onSliderProgressChanged?.call(newProgress);
+        }
+
+        void finishDragOrTap() {
+          if (!isDraggable) return;
+
+          if (meterType == _MeterType.sound) {
+            final level =
+                _pendingSoundLevel ?? _levelFromProgress(_soundSliderProgress);
+
+            setState(() {
+              _isDraggingSound = false;
+            });
+
+            if (_lastSoundLevelSent != level) {
+              _lastSoundLevelSent = level;
+              onMeterLevelChanged?.call(level);
+            }
+          }
+
+          if (meterType == _MeterType.light) {
+            final level =
+                _pendingLightLevel ?? _levelFromProgress(_lightSliderProgress);
+
+            setState(() {
+              _isDraggingLight = false;
+            });
+
+            if (_lastLightLevelSent != level) {
+              _lastLightLevelSent = level;
+              onMeterLevelChanged?.call(level);
+            }
+          }
+        }
+
+        final meterContent = AnimatedBuilder(
           animation: _loopController,
           builder: (context, child) {
             final pulse = _loopController.value;
@@ -771,6 +959,35 @@ class _StageRightPanelState extends State<StageRightPanel>
                       fit: BoxFit.fill,
                     ),
                   ),
+                  if (isDraggable)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 1,
+                      child: Container(
+                        height: 32,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(99),
+                          color: Colors.transparent,
+                        ),
+                      ),
+                    ),
+                  if (isDraggable)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 8,
+                      child: Container(
+                        height: 21,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(
+                            color: const Color(0xFF6B9E66).withOpacity(0.12),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                    ),
                   if (status != StagePanelStatus.neutral)
                     Positioned(
                       left: (constraints.maxWidth - 16) * pulse,
@@ -785,8 +1002,10 @@ class _StageRightPanelState extends State<StageRightPanel>
                       ),
                     ),
                   AnimatedPositioned(
-                    duration: const Duration(milliseconds: 420),
-                    curve: Curves.easeOutBack,
+                    duration: isDraggable
+                        ? const Duration(milliseconds: 35)
+                        : const Duration(milliseconds: 420),
+                    curve: Curves.easeOut,
                     left: knobLeft,
                     top: 3,
                     child: Transform.scale(
@@ -803,6 +1022,36 @@ class _StageRightPanelState extends State<StageRightPanel>
               ),
             );
           },
+        );
+
+        if (!isDraggable) {
+          return meterContent;
+        }
+
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (details) {
+              updateFromDx(details.localPosition.dx);
+            },
+            onTapUp: (_) {
+              finishDragOrTap();
+            },
+            onPanStart: (details) {
+              updateFromDx(details.localPosition.dx);
+            },
+            onPanUpdate: (details) {
+              updateFromDx(details.localPosition.dx);
+            },
+            onPanEnd: (_) {
+              finishDragOrTap();
+            },
+            onPanCancel: () {
+              finishDragOrTap();
+            },
+            child: meterContent,
+          ),
         );
       },
     );
@@ -888,13 +1137,6 @@ class _StageRightPanelState extends State<StageRightPanel>
                     isWarning
                         ? '$_assetBase/warning_badge.png'
                         : '$_assetBase/icon_feedback.png',
-                    /*
-                      AANWIJZING:
-                      Feedback icon kleiner gemaakt.
-
-                      Eerst: 24
-                      Nu: 20
-                    */
                     width: 20,
                     height: 20,
                     fit: BoxFit.contain,
@@ -924,13 +1166,6 @@ class _StageRightPanelState extends State<StageRightPanel>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.caveat(
-                        /*
-                          AANWIJZING:
-                          Feedback tekst kleiner gemaakt.
-
-                          Eerst: 25
-                          Nu: 21
-                        */
                         fontSize: 21,
                         height: 0.95,
                         fontWeight: FontWeight.w900,
@@ -988,22 +1223,58 @@ class _StageRightPanelState extends State<StageRightPanel>
     if (message.contains('Power is getting risky')) {
       return 'POWER RISKY!';
     }
-    if (message.contains('Sound is too loud')) {
+    if (message.contains('Almost full')) {
+      return 'POWER ALMOST FULL!';
+    }
+
+    if (message.contains('distorted') ||
+        message.contains('breaking') ||
+        message.contains('cracks')) {
+      return 'SPEAKER DISTORTED!';
+    }
+
+    if (message.contains('too loud')) {
       return 'SOUND TOO LOUD!';
     }
-    if (message.contains('Sound is too low')) {
+    if (message.contains('too low') ||
+        message.contains('barely hear') ||
+        message.contains('soft')) {
       return 'SOUND TOO LOW!';
     }
-    if (message.contains('Lighting is too intense')) {
+
+    if (message.contains('huge sound') ||
+        message.contains('festival sound') ||
+        message.contains('powerful')) {
+      return 'BIG FESTIVAL SOUND!';
+    }
+
+    if (message.contains('clean sound') ||
+        message.contains('good balance') ||
+        message.contains('clear sound') ||
+        message.contains('loud and still stable') ||
+        message.contains('usable')) {
+      return 'NICE SOUND BALANCE!';
+    }
+
+    if (message.contains('too hot')) {
+      return 'LIGHT TOO HOT!';
+    }
+    if (message.contains('too dark')) {
+      return 'LIGHT TOO LOW!';
+    }
+    if (message.contains('too bright')) {
       return 'LIGHT TOO HIGH!';
     }
-    if (message.contains('Lighting is too low')) {
-      return 'LIGHT TOO LOW!';
+    if (message.contains('nice light') ||
+        message.contains('nice vibe') ||
+        message.contains('wow effect') ||
+        message.contains('bright and safe')) {
+      return 'NICE BALANCE!';
     }
     if (message.contains('Nice balance')) {
       return 'STAGE READY!';
     }
-    return 'CHOOSE PARTS!';
+    return 'KEEP TUNING!';
   }
 
   StagePanelStatus _mainStatus(
@@ -1030,26 +1301,19 @@ class _StageRightPanelState extends State<StageRightPanel>
     return StagePanelStatus.neutral;
   }
 
-  double _soundProgress() {
-    if (widget.state.currentSoundDb <= 0) {
-      return 0;
-    }
-    return widget.state.currentSoundDb / 100;
-  }
-
-  double _lightProgress() {
-    if (widget.state.currentLightIntensity <= 0) {
-      return 0;
-    }
-    return widget.state.currentLightIntensity / 100;
-  }
-
   double _powerProgress() {
     if (widget.state.currentPowerCapacity <= 0) {
       return 0;
     }
+
     return widget.state.powerUsageRatio.clamp(0.0, 1.0);
   }
+}
+
+enum _MeterType {
+  power,
+  sound,
+  light,
 }
 
 class _WarningShake extends StatefulWidget {

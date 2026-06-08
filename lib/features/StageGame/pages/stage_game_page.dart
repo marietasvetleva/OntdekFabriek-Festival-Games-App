@@ -1,7 +1,21 @@
+// IMPORTANT:
+// StageGamePage full file.
+// Current fixes:
+// 1. Sound system stays as fixed before.
+// 2. Light meter does not move before choosing a light source.
+// 3. When choosing LED / Smart / Halogen, light starts at low / 0 bar position.
+// 4. When changing light option, the light bar resets back to 0.
+// 5. Sound, Light and Effects cannot be chosen before Power Source is chosen.
+// 6. Sound audio does not start automatically.
+// 7. Cheap speaker high stops clean music and plays distortion.
+// 8. FinalScreen handles cheer/boo sound.
+
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../services/led_service.dart';
+import '../services/stage_audio_service.dart';
 import '../logic/stage_game_logic.dart';
 import '../logic/stage_game_models.dart';
 import '../widgets/stage_right_panel.dart';
@@ -17,36 +31,22 @@ class StageGamePage extends StatefulWidget {
 class _StageGamePageState extends State<StageGamePage>
     with SingleTickerProviderStateMixin {
   final StageGameLogic _logic = StageGameLogic();
+  final StageAudioService _audioService = StageAudioService();
+
   late StageGameState _state;
 
-  /*
-    AANWIJZING:
-    Alle nieuwe middle-stage assets staan direct in:
-    assets/StageGameV2-image/
-
-    Deze assets komen van je klasgenoot:
-    - cheapspeaker.png
-    - ecospeaker-removebg-preview.png
-    - prospeaker.png
-    - led.png
-    - smart.png
-    - halogen.png
-    - solar.png
-    - hybrid.png
-    - generator.png
-    - laser.png
-    - drone.png
-    - firewoks.png
-
-    Let op:
-    In jouw screenshot heet het bestand firewoks.png.
-    Als jouw bestand anders heet, pas alleen de naam aan in _effectAsset().
-  */
   static const String _assetBase = 'assets/StageGameV2-image';
 
   late final AnimationController _stageFxController;
 
   bool _isEndingRound = false;
+
+  bool _audioReady = false;
+  bool _backgroundMusicStarted = false;
+  bool _isDistortionPlaying = false;
+
+  double _liveSoundSliderProgress = 0.5;
+  double _liveLightSliderProgress = 0.0;
 
   @override
   void initState() {
@@ -55,16 +55,185 @@ class _StageGamePageState extends State<StageGamePage>
     _state = _logic.createInitialState();
     _logic.start(_state);
 
+    _liveSoundSliderProgress = _progressFromLevel(_state.soundControlLevel);
+    _liveLightSliderProgress = _state.selectedLight == null
+        ? 0.0
+        : _progressFromLevel(_state.lightControlLevel);
+
     _stageFxController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1900),
     )..repeat();
+
+    _audioService.init().then((_) {
+      if (!mounted) return;
+      _audioReady = true;
+    });
   }
 
   @override
   void dispose() {
     _stageFxController.dispose();
+    _audioService.dispose();
     super.dispose();
+  }
+
+  double _progressFromLevel(StageControlLevel level) {
+    switch (level) {
+      case StageControlLevel.low:
+        return 0.0;
+      case StageControlLevel.medium:
+        return 0.5;
+      case StageControlLevel.high:
+        return 1.0;
+    }
+  }
+
+  bool get _hasPowerSource {
+    return _state.selectedPowerSource != null;
+  }
+
+  void _handleGameChange() {
+    _liveSoundSliderProgress = _progressFromLevel(_state.soundControlLevel);
+
+    _liveLightSliderProgress = _state.selectedLight == null
+        ? 0.0
+        : _progressFromLevel(_state.lightControlLevel);
+
+    _playPrototypeAudioFeedback();
+    _checkForInstantPowerFailure();
+  }
+
+  void _handleLiveSoundSlider(double progress) {
+    _liveSoundSliderProgress = progress.clamp(0.0, 1.0);
+
+    if (!_audioReady || _isEndingRound) return;
+
+    if (_state.selectedSound == null) {
+      _stopBackgroundMusicFlagged();
+      _stopDistortionIfNeeded();
+      return;
+    }
+
+    final isCheapMax = _state.selectedSound == SoundOption.cheap &&
+        _state.soundControlLevel == StageControlLevel.high;
+
+    if (isCheapMax) {
+      _stopBackgroundMusicFlagged();
+      _startDistortionIfNeeded();
+      return;
+    }
+
+    _stopDistortionIfNeeded();
+    _startOrUpdateMusicForSelectedSpeaker();
+  }
+
+  void _handleLiveLightSlider(double progress) {
+    if (_state.selectedLight == null || _isEndingRound) {
+      setState(() {
+        _liveLightSliderProgress = 0.0;
+      });
+      return;
+    }
+
+    setState(() {
+      _liveLightSliderProgress = progress.clamp(0.0, 1.0);
+    });
+  }
+
+  void _startBackgroundMusicIfNeeded() {
+    if (_backgroundMusicStarted) return;
+
+    _audioService.startBackgroundMusic();
+    _backgroundMusicStarted = true;
+  }
+
+  void _stopBackgroundMusicFlagged() {
+    _audioService.stopBackgroundMusic();
+    _backgroundMusicStarted = false;
+  }
+
+  void _startDistortionIfNeeded() {
+    if (_isDistortionPlaying) return;
+
+    _audioService.playSpeakerDistortion();
+    _isDistortionPlaying = true;
+  }
+
+  void _stopDistortionIfNeeded() {
+    if (!_isDistortionPlaying) return;
+
+    _audioService.stopEffects();
+    _isDistortionPlaying = false;
+  }
+
+  double _targetBackgroundVolume() {
+    final p = _liveSoundSliderProgress.clamp(0.0, 1.0);
+
+    if (_state.selectedSound == SoundOption.cheap) {
+      return 0.006 + (p * 0.065);
+    }
+
+    if (_state.selectedSound == SoundOption.eco) {
+      return 0.015 + (p * 0.280);
+    }
+
+    if (_state.selectedSound == SoundOption.pro) {
+      return 0.020 + (p * 0.430);
+    }
+
+    return 0.0;
+  }
+
+  void _startOrUpdateMusicForSelectedSpeaker() {
+    if (!_audioReady || _isEndingRound) return;
+
+    if (_state.selectedSound == null) {
+      _stopBackgroundMusicFlagged();
+      return;
+    }
+
+    final isCheapMax = _state.selectedSound == SoundOption.cheap &&
+        _state.soundControlLevel == StageControlLevel.high;
+
+    if (isCheapMax) {
+      _stopBackgroundMusicFlagged();
+      _startDistortionIfNeeded();
+      return;
+    }
+
+    _startBackgroundMusicIfNeeded();
+    _audioService.setBackgroundVolume(_targetBackgroundVolume());
+  }
+
+  void _playPrototypeAudioFeedback() {
+    if (_isEndingRound || !_audioReady) return;
+
+    final isOverloaded = _state.currentPowerCapacity > 0 &&
+        _state.totalPowerLoad > _state.currentPowerCapacity;
+
+    if (isOverloaded) {
+      _stopBackgroundMusicFlagged();
+      _stopDistortionIfNeeded();
+      _audioService.playPowerOverload();
+      return;
+    }
+
+    final powerRatio = _state.powerUsageRatio;
+
+    if (powerRatio >= 0.8 && _state.currentPowerCapacity > 0) {
+      _audioService.playPowerWarning();
+    }
+
+    if (_state.selectedSound == SoundOption.cheap &&
+        _state.soundControlLevel == StageControlLevel.high) {
+      _stopBackgroundMusicFlagged();
+      _startDistortionIfNeeded();
+      return;
+    }
+
+    _stopDistortionIfNeeded();
+    _startOrUpdateMusicForSelectedSpeaker();
   }
 
   void _checkForInstantPowerFailure() {
@@ -81,17 +250,19 @@ class _StageGamePageState extends State<StageGamePage>
   Future<void> _triggerPowerOverloadFailure() async {
     if (_isEndingRound) return;
 
+    _stopBackgroundMusicFlagged();
+    _stopDistortionIfNeeded();
+    _audioService.playPowerOverload();
+    _audioService.playLightFlicker();
+
     setState(() {
-      /*
-        AANWIJZING:
-        Bij power overload locken we direct de keuzes.
-        De speler kan dus 7 seconden kijken naar de fout,
-        maar niks meer aanpassen.
-      */
       _isEndingRound = true;
     });
 
     await Future.delayed(const Duration(seconds: 7));
+
+    await _audioService.stopBackgroundMusic();
+    _backgroundMusicStarted = false;
 
     try {
       await LedService.completeMinigame('stage', 0);
@@ -121,6 +292,11 @@ class _StageGamePageState extends State<StageGamePage>
       _logic.finishRound(_state);
     });
 
+    await _audioService.stopBackgroundMusic();
+    _backgroundMusicStarted = false;
+    _stopDistortionIfNeeded();
+    _audioService.stopEffects();
+
     final totalScore = _state.stabilityScore +
         _state.sustainabilityScore +
         _state.audienceSatisfactionScore;
@@ -128,6 +304,8 @@ class _StageGamePageState extends State<StageGamePage>
     try {
       await LedService.completeMinigame('stage', totalScore);
     } catch (_) {}
+
+    await Future.delayed(const Duration(milliseconds: 350));
 
     if (!mounted) return;
 
@@ -189,11 +367,6 @@ class _StageGamePageState extends State<StageGamePage>
     }
   }
 
-  /*
-    AANWIJZING:
-    Deze asset methodes zijn gebaseerd op het werk van je klasgenoot,
-    maar aangepast naar jouw huidige enums en juiste Flutter asset paths.
-  */
   String? _soundAsset() {
     switch (_state.selectedSound) {
       case SoundOption.cheap:
@@ -252,6 +425,7 @@ class _StageGamePageState extends State<StageGamePage>
     required String Function(T option) labelBuilder,
     required void Function(T option) onSelected,
     double fontSize = 12,
+    bool enabled = true,
   }) {
     return Wrap(
       alignment: WrapAlignment.center,
@@ -259,26 +433,34 @@ class _StageGamePageState extends State<StageGamePage>
       runSpacing: 7,
       children: options.map((option) {
         final isSelected = selected == option;
+        final canPress = enabled && !_isEndingRound;
 
         return ChoiceChip(
           label: Text(labelBuilder(option)),
           selected: isSelected,
-          onSelected: _isEndingRound ? null : (_) => onSelected(option),
+          onSelected: canPress ? (_) => onSelected(option) : null,
           selectedColor: const Color(0xFFE2D5F2),
-          backgroundColor: const Color(0xFFFAF8FC),
+          backgroundColor: canPress
+              ? const Color(0xFFFAF8FC)
+              : const Color(0xFFE4E1DC),
+          disabledColor: const Color(0xFFE4E1DC),
           visualDensity: VisualDensity.compact,
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
           side: BorderSide(
             color: isSelected
                 ? const Color(0xFFB9A7D6)
-                : const Color(0xFFCFC8D5),
+                : canPress
+                    ? const Color(0xFFCFC8D5)
+                    : const Color(0xFFBEBAB2),
             width: 1.1,
           ),
           labelStyle: TextStyle(
             fontSize: fontSize,
             fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-            color: const Color(0xFF3A3940),
+            color: canPress
+                ? const Color(0xFF3A3940)
+                : const Color(0xFF8B887F),
           ),
         );
       }).toList(),
@@ -290,12 +472,19 @@ class _StageGamePageState extends State<StageGamePage>
       options: SoundOption.values,
       selected: _state.selectedSound,
       fontSize: fontSize,
+      enabled: _hasPowerSource,
       labelBuilder: _soundOptionLabel,
       onSelected: (option) {
+        if (!_hasPowerSource) return;
+
         setState(() {
           _logic.selectSound(_state, option);
+          _liveSoundSliderProgress = _progressFromLevel(
+            _state.soundControlLevel,
+          );
         });
-        _checkForInstantPowerFailure();
+
+        _handleGameChange();
       },
     );
   }
@@ -305,12 +494,18 @@ class _StageGamePageState extends State<StageGamePage>
       options: LightOption.values,
       selected: _state.selectedLight,
       fontSize: fontSize,
+      enabled: _hasPowerSource,
       labelBuilder: _lightOptionLabel,
       onSelected: (option) {
+        if (!_hasPowerSource) return;
+
         setState(() {
           _logic.selectLight(_state, option);
+          _logic.selectLightLevel(_state, StageControlLevel.low);
+          _liveLightSliderProgress = 0.0;
         });
-        _checkForInstantPowerFailure();
+
+        _handleGameChange();
       },
     );
   }
@@ -320,12 +515,14 @@ class _StageGamePageState extends State<StageGamePage>
       options: PowerSourceOption.values,
       selected: _state.selectedPowerSource,
       fontSize: fontSize,
+      enabled: true,
       labelBuilder: _powerSourceLabel,
       onSelected: (option) {
         setState(() {
           _logic.selectPowerSource(_state, option);
         });
-        _checkForInstantPowerFailure();
+
+        _handleGameChange();
       },
     );
   }
@@ -335,12 +532,16 @@ class _StageGamePageState extends State<StageGamePage>
       options: EffectOption.values,
       selected: _state.selectedEffect,
       fontSize: fontSize,
+      enabled: _hasPowerSource,
       labelBuilder: _effectOptionLabel,
       onSelected: (option) {
+        if (!_hasPowerSource) return;
+
         setState(() {
           _logic.selectEffect(_state, option);
         });
-        _checkForInstantPowerFailure();
+
+        _handleGameChange();
       },
     );
   }
@@ -454,7 +655,7 @@ class _StageGamePageState extends State<StageGamePage>
           ),
           const SizedBox(height: 1),
           Text(
-            'Pick parts for the stage',
+            'Pick power first, then tune the stage',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.caveat(
@@ -623,74 +824,92 @@ class _StageGamePageState extends State<StageGamePage>
     required Color iconBg,
     required bool selected,
     required VoidCallback onTap,
+    bool enabled = true,
   }) {
+    final canPress = enabled && !_isEndingRound;
+
     return GestureDetector(
-      onTap: _isEndingRound ? null : onTap,
-      child: AnimatedContainer(
+      onTap: canPress ? onTap : null,
+      child: AnimatedOpacity(
         duration: const Duration(milliseconds: 170),
-        curve: Curves.easeOut,
-        margin: const EdgeInsets.symmetric(horizontal: 1.5),
-        padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 1),
-        decoration: BoxDecoration(
-          color: selected ? iconBg : const Color(0xFFFDFCF7),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected ? accentColor : const Color(0xFFE1DCCB),
-            width: selected ? 1.7 : 1,
+        opacity: canPress ? 1.0 : 0.45,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 170),
+          curve: Curves.easeOut,
+          margin: const EdgeInsets.symmetric(horizontal: 1.5),
+          padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 1),
+          decoration: BoxDecoration(
+            color: selected ? iconBg : const Color(0xFFFDFCF7),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected
+                  ? accentColor
+                  : canPress
+                      ? const Color(0xFFE1DCCB)
+                      : const Color(0xFFC9C4BA),
+              width: selected ? 1.7 : 1,
+            ),
+            boxShadow: [
+              if (selected && canPress)
+                BoxShadow(
+                  color: accentColor.withOpacity(0.22),
+                  blurRadius: 7,
+                  spreadRadius: 0.5,
+                ),
+            ],
           ),
-          boxShadow: [
-            if (selected)
-              BoxShadow(
-                color: accentColor.withOpacity(0.22),
-                blurRadius: 7,
-                spreadRadius: 0.5,
-              ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedScale(
-              scale: selected ? 1.12 : 1,
-              duration: const Duration(milliseconds: 170),
-              curve: Curves.easeOutBack,
-              child: Container(
-                width: 23,
-                height: 23,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? Colors.white.withOpacity(0.65)
-                      : iconBg.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedScale(
+                scale: selected ? 1.12 : 1,
+                duration: const Duration(milliseconds: 170),
+                curve: Curves.easeOutBack,
+                child: Container(
+                  width: 23,
+                  height: 23,
+                  decoration: BoxDecoration(
                     color: selected
-                        ? accentColor.withOpacity(0.75)
-                        : const Color(0xFFE0DED5),
-                    width: 1,
+                        ? Colors.white.withOpacity(0.65)
+                        : iconBg.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: selected
+                          ? accentColor.withOpacity(0.75)
+                          : const Color(0xFFE0DED5),
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 15,
+                    color: canPress
+                        ? selected
+                            ? accentColor
+                            : const Color(0xFF5E665C)
+                        : const Color(0xFF8B887F),
                   ),
                 ),
-                child: Icon(
-                  icon,
-                  size: 15,
-                  color: selected ? accentColor : const Color(0xFF5E665C),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 8,
+                  height: 1,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  color: canPress
+                      ? selected
+                          ? const Color(0xFF263524)
+                          : const Color(0xFF333333)
+                      : const Color(0xFF8B887F),
                 ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 8,
-                height: 1,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                color:
-                    selected ? const Color(0xFF263524) : const Color(0xFF333333),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -747,11 +966,13 @@ class _StageGamePageState extends State<StageGamePage>
         accentColor: const Color(0xFFDCA63A),
         iconBg: const Color(0xFFFFF1B8),
         selected: _state.selectedPowerSource == PowerSourceOption.solar,
+        enabled: true,
         onTap: () {
           setState(() {
             _logic.selectPowerSource(_state, PowerSourceOption.solar);
           });
-          _checkForInstantPowerFailure();
+
+          _handleGameChange();
         },
       ),
       _assistantOptionButton(
@@ -760,11 +981,13 @@ class _StageGamePageState extends State<StageGamePage>
         accentColor: const Color(0xFF6B9E66),
         iconBg: const Color(0xFFE5F3D6),
         selected: _state.selectedPowerSource == PowerSourceOption.hybrid,
+        enabled: true,
         onTap: () {
           setState(() {
             _logic.selectPowerSource(_state, PowerSourceOption.hybrid);
           });
-          _checkForInstantPowerFailure();
+
+          _handleGameChange();
         },
       ),
       _assistantOptionButton(
@@ -773,11 +996,13 @@ class _StageGamePageState extends State<StageGamePage>
         accentColor: const Color(0xFF9A7AB8),
         iconBg: const Color(0xFFF0E6F5),
         selected: _state.selectedPowerSource == PowerSourceOption.generator,
+        enabled: true,
         onTap: () {
           setState(() {
             _logic.selectPowerSource(_state, PowerSourceOption.generator);
           });
-          _checkForInstantPowerFailure();
+
+          _handleGameChange();
         },
       ),
     ];
@@ -791,11 +1016,18 @@ class _StageGamePageState extends State<StageGamePage>
         accentColor: const Color(0xFF6B9E66),
         iconBg: const Color(0xFFE5F3D6),
         selected: _state.selectedSound == SoundOption.cheap,
+        enabled: _hasPowerSource,
         onTap: () {
+          if (!_hasPowerSource) return;
+
           setState(() {
             _logic.selectSound(_state, SoundOption.cheap);
+            _liveSoundSliderProgress = _progressFromLevel(
+              _state.soundControlLevel,
+            );
           });
-          _checkForInstantPowerFailure();
+
+          _handleGameChange();
         },
       ),
       _assistantOptionButton(
@@ -804,11 +1036,18 @@ class _StageGamePageState extends State<StageGamePage>
         accentColor: const Color(0xFF6B9E66),
         iconBg: const Color(0xFFE5F3D6),
         selected: _state.selectedSound == SoundOption.eco,
+        enabled: _hasPowerSource,
         onTap: () {
+          if (!_hasPowerSource) return;
+
           setState(() {
             _logic.selectSound(_state, SoundOption.eco);
+            _liveSoundSliderProgress = _progressFromLevel(
+              _state.soundControlLevel,
+            );
           });
-          _checkForInstantPowerFailure();
+
+          _handleGameChange();
         },
       ),
       _assistantOptionButton(
@@ -817,11 +1056,18 @@ class _StageGamePageState extends State<StageGamePage>
         accentColor: const Color(0xFF5B8FA8),
         iconBg: const Color(0xFFDDEFF4),
         selected: _state.selectedSound == SoundOption.pro,
+        enabled: _hasPowerSource,
         onTap: () {
+          if (!_hasPowerSource) return;
+
           setState(() {
             _logic.selectSound(_state, SoundOption.pro);
+            _liveSoundSliderProgress = _progressFromLevel(
+              _state.soundControlLevel,
+            );
           });
-          _checkForInstantPowerFailure();
+
+          _handleGameChange();
         },
       ),
     ];
@@ -835,11 +1081,15 @@ class _StageGamePageState extends State<StageGamePage>
         accentColor: const Color(0xFF5B8FA8),
         iconBg: const Color(0xFFDDEFF4),
         selected: _state.selectedEffect == EffectOption.laser,
+        enabled: _hasPowerSource,
         onTap: () {
+          if (!_hasPowerSource) return;
+
           setState(() {
             _logic.selectEffect(_state, EffectOption.laser);
           });
-          _checkForInstantPowerFailure();
+
+          _handleGameChange();
         },
       ),
       _assistantOptionButton(
@@ -848,11 +1098,15 @@ class _StageGamePageState extends State<StageGamePage>
         accentColor: const Color(0xFF9A7AB8),
         iconBg: const Color(0xFFF0E6F5),
         selected: _state.selectedEffect == EffectOption.drone,
+        enabled: _hasPowerSource,
         onTap: () {
+          if (!_hasPowerSource) return;
+
           setState(() {
             _logic.selectEffect(_state, EffectOption.drone);
           });
-          _checkForInstantPowerFailure();
+
+          _handleGameChange();
         },
       ),
       _assistantOptionButton(
@@ -861,11 +1115,15 @@ class _StageGamePageState extends State<StageGamePage>
         accentColor: const Color(0xFFD47B4D),
         iconBg: const Color(0xFFFBE4D3),
         selected: _state.selectedEffect == EffectOption.fireworks,
+        enabled: _hasPowerSource,
         onTap: () {
+          if (!_hasPowerSource) return;
+
           setState(() {
             _logic.selectEffect(_state, EffectOption.fireworks);
           });
-          _checkForInstantPowerFailure();
+
+          _handleGameChange();
         },
       ),
     ];
@@ -879,11 +1137,17 @@ class _StageGamePageState extends State<StageGamePage>
         accentColor: const Color(0xFFE2B84F),
         iconBg: const Color(0xFFFFF1B8),
         selected: _state.selectedLight == LightOption.led,
+        enabled: _hasPowerSource,
         onTap: () {
+          if (!_hasPowerSource) return;
+
           setState(() {
             _logic.selectLight(_state, LightOption.led);
+            _logic.selectLightLevel(_state, StageControlLevel.low);
+            _liveLightSliderProgress = 0.0;
           });
-          _checkForInstantPowerFailure();
+
+          _handleGameChange();
         },
       ),
       _assistantOptionButton(
@@ -892,11 +1156,17 @@ class _StageGamePageState extends State<StageGamePage>
         accentColor: const Color(0xFF5B8FA8),
         iconBg: const Color(0xFFDDEFF4),
         selected: _state.selectedLight == LightOption.smart,
+        enabled: _hasPowerSource,
         onTap: () {
+          if (!_hasPowerSource) return;
+
           setState(() {
             _logic.selectLight(_state, LightOption.smart);
+            _logic.selectLightLevel(_state, StageControlLevel.low);
+            _liveLightSliderProgress = 0.0;
           });
-          _checkForInstantPowerFailure();
+
+          _handleGameChange();
         },
       ),
       _assistantOptionButton(
@@ -905,11 +1175,17 @@ class _StageGamePageState extends State<StageGamePage>
         accentColor: const Color(0xFFD47B4D),
         iconBg: const Color(0xFFFBE4D3),
         selected: _state.selectedLight == LightOption.halogen,
+        enabled: _hasPowerSource,
         onTap: () {
+          if (!_hasPowerSource) return;
+
           setState(() {
             _logic.selectLight(_state, LightOption.halogen);
+            _logic.selectLightLevel(_state, StageControlLevel.low);
+            _liveLightSliderProgress = 0.0;
           });
-          _checkForInstantPowerFailure();
+
+          _handleGameChange();
         },
       ),
     ];
@@ -922,10 +1198,14 @@ class _StageGamePageState extends State<StageGamePage>
       _logic.selectPowerSource(_state, PowerSourceOption.solar);
       _logic.selectSound(_state, SoundOption.eco);
       _logic.selectLight(_state, LightOption.led);
+      _logic.selectLightLevel(_state, StageControlLevel.low);
       _logic.selectEffect(_state, EffectOption.laser);
+
+      _liveSoundSliderProgress = _progressFromLevel(_state.soundControlLevel);
+      _liveLightSliderProgress = 0.0;
     });
 
-    _checkForInstantPowerFailure();
+    _handleGameChange();
   }
 
   void _applyBalancedPreset() {
@@ -935,10 +1215,14 @@ class _StageGamePageState extends State<StageGamePage>
       _logic.selectPowerSource(_state, PowerSourceOption.hybrid);
       _logic.selectSound(_state, SoundOption.eco);
       _logic.selectLight(_state, LightOption.smart);
+      _logic.selectLightLevel(_state, StageControlLevel.low);
       _logic.selectEffect(_state, EffectOption.drone);
+
+      _liveSoundSliderProgress = _progressFromLevel(_state.soundControlLevel);
+      _liveLightSliderProgress = 0.0;
     });
 
-    _checkForInstantPowerFailure();
+    _handleGameChange();
   }
 
   void _applyPerformancePreset() {
@@ -948,10 +1232,14 @@ class _StageGamePageState extends State<StageGamePage>
       _logic.selectPowerSource(_state, PowerSourceOption.generator);
       _logic.selectSound(_state, SoundOption.pro);
       _logic.selectLight(_state, LightOption.halogen);
+      _logic.selectLightLevel(_state, StageControlLevel.low);
       _logic.selectEffect(_state, EffectOption.fireworks);
+
+      _liveSoundSliderProgress = _progressFromLevel(_state.soundControlLevel);
+      _liveLightSliderProgress = 0.0;
     });
 
-    _checkForInstantPowerFailure();
+    _handleGameChange();
   }
 
   Widget _buildPlayerTwoConsole(double boardHeight) {
@@ -968,6 +1256,26 @@ class _StageGamePageState extends State<StageGamePage>
           child: StageRightPanel(
             state: _state,
             config: _logic.config,
+            onSoundSliderProgressChanged: _handleLiveSoundSlider,
+            onLightSliderProgressChanged: _handleLiveLightSlider,
+            onSoundLevelChanged: (level) {
+              setState(() {
+                _logic.selectSoundLevel(_state, level);
+                _liveSoundSliderProgress = _progressFromLevel(level);
+              });
+
+              _handleGameChange();
+            },
+            onLightLevelChanged: (level) {
+              if (_state.selectedLight == null) return;
+
+              setState(() {
+                _logic.selectLightLevel(_state, level);
+                _liveLightSliderProgress = _progressFromLevel(level);
+              });
+
+              _handleGameChange();
+            },
           ),
         ),
       ),
@@ -979,7 +1287,7 @@ class _StageGamePageState extends State<StageGamePage>
         _state.totalPowerLoad > _state.currentPowerCapacity;
 
     final lightColor = _selectedLightColor();
-    final lightOpacity = _state.selectedLight == null ? 0.04 : 0.18;
+    final lightOpacity = _state.selectedLight == null ? 0.04 : _lightOpacity();
 
     return Container(
       height: height,
@@ -1015,53 +1323,50 @@ class _StageGamePageState extends State<StageGamePage>
                     color: const Color(0xFFF2EEE4),
                   ),
                 ),
-
-                /*
-                  AANWIJZING:
-                  Kleurlaag afhankelijk van gekozen light.
-                  Dit blijft subtiel zodat de stage image zichtbaar blijft.
-                */
                 Positioned.fill(
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 500),
+                    duration: const Duration(milliseconds: 250),
                     curve: Curves.easeOut,
                     color: lightColor.withOpacity(lightOpacity),
                   ),
                 ),
-
                 if (_state.selectedLight != null)
                   Positioned.fill(
                     child: IgnorePointer(
                       child: _buildStageGlow(lightColor),
                     ),
                   ),
-
                 Positioned.fill(
                   child: Padding(
                     padding: const EdgeInsets.all(10),
                     child: FittedBox(
                       fit: BoxFit.contain,
-                      child: RotatedBox(
-                        quarterTurns: 1,
-                        child: Image.asset(
-                          '$_assetBase/Stage_top_view.png',
+                      child: SizedBox(
+                        width: 720,
+                        height: 520,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Positioned.fill(
+                              child: RotatedBox(
+                                quarterTurns: 0,
+                                child: Image.asset(
+                                  '$_assetBase/Stage_top_view.png',
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                            _buildSelectedPowerOnStage(pulse),
+                            _buildSelectedSoundOnStage(pulse),
+                            _buildSelectedLightOnStage(pulse),
+                            _buildSelectedEffectOnStage(pulse),
+                            _buildCrowdFeedbackOnStage(pulse),
+                          ],
                         ),
                       ),
                     ),
                   ),
                 ),
-
-                /*
-                  AANWIJZING:
-                  Nieuwe middle stage:
-                  Hier plaatsen we de assets van je klasgenoot op de stage.
-                */
-                _buildSelectedPowerOnStage(pulse),
-                _buildSelectedSoundOnStage(pulse),
-                _buildSelectedLightOnStage(pulse),
-                _buildSelectedEffectOnStage(pulse),
-                _buildCrowdReactionBubbles(pulse),
-
                 if (isOverloaded)
                   Positioned.fill(
                     child: AnimatedContainer(
@@ -1104,6 +1409,16 @@ class _StageGamePageState extends State<StageGamePage>
     );
   }
 
+  double _lightOpacity() {
+    if (_state.selectedLight == null) return 0.04;
+    return 0.05 + (_liveLightSliderProgress * 0.19);
+  }
+
+  double _lightGlowPower() {
+    if (_state.selectedLight == null) return 0.0;
+    return 0.45 + (_liveLightSliderProgress * 0.70);
+  }
+
   Color _selectedLightColor() {
     if (_state.selectedLight == LightOption.led) {
       return const Color(0xFF62B6F0);
@@ -1121,14 +1436,16 @@ class _StageGamePageState extends State<StageGamePage>
   }
 
   Widget _buildStageGlow(Color color) {
+    final glowPower = _lightGlowPower();
+
     return Container(
       decoration: BoxDecoration(
         gradient: RadialGradient(
           center: Alignment.topCenter,
           radius: 0.95,
           colors: [
-            color.withOpacity(0.22),
-            color.withOpacity(0.10),
+            color.withOpacity(0.22 * glowPower),
+            color.withOpacity(0.10 * glowPower),
             Colors.transparent,
           ],
           stops: const [0.0, 0.48, 1.0],
@@ -1137,11 +1454,6 @@ class _StageGamePageState extends State<StageGamePage>
     );
   }
 
-  /*
-    AANWIJZING:
-    Power source asset wordt linksvoor naast de stage gezet.
-    Zo ziet speler dat de gekozen stroombron actief is.
-  */
   Widget _buildSelectedPowerOnStage(double pulse) {
     final asset = _powerAsset();
     if (asset == null) return const SizedBox.shrink();
@@ -1160,35 +1472,43 @@ class _StageGamePageState extends State<StageGamePage>
     );
   }
 
-  /*
-    AANWIJZING:
-    Speakers worden links en rechts van de stage gezet.
-    Dit past beter dan één klein icoon midden in de stage.
-  */
   Widget _buildSelectedSoundOnStage(double pulse) {
     final asset = _soundAsset();
     if (asset == null) return const SizedBox.shrink();
 
+    final isDistorted = _state.selectedSound == SoundOption.cheap &&
+        _state.soundControlLevel == StageControlLevel.high;
+
+    final shake = isDistorted ? math.sin(pulse * math.pi * 16) * 5 : 0.0;
+    final rotate = isDistorted ? math.sin(pulse * math.pi * 14) * 0.05 : 0.0;
+    final size = _state.selectedSound == SoundOption.pro ? 76.0 : 70.0;
+
     return Stack(
       children: [
         Positioned(
-          left: 135,
+          left: 135 + shake,
           top: 215 + math.sin(pulse * math.pi * 2) * 2,
-          child: _stageAssetImage(
-            asset: asset,
-            size: 72,
-            pulse: pulse,
+          child: Transform.rotate(
+            angle: rotate,
+            child: _stageAssetImage(
+              asset: asset,
+              size: size,
+              pulse: pulse,
+            ),
           ),
         ),
         Positioned(
-          right: 135,
+          right: 135 - shake,
           top: 215 + math.sin((pulse + 0.3) * math.pi * 2) * 2,
           child: Transform.scale(
             scaleX: -1,
-            child: _stageAssetImage(
-              asset: asset,
-              size: 72,
-              pulse: pulse,
+            child: Transform.rotate(
+              angle: -rotate,
+              child: _stageAssetImage(
+                asset: asset,
+                size: size,
+                pulse: pulse,
+              ),
             ),
           ),
         ),
@@ -1196,17 +1516,14 @@ class _StageGamePageState extends State<StageGamePage>
     );
   }
 
-  /*
-    AANWIJZING:
-    Light assets worden bij de bovenkant van het podium gezet.
-    De lampen hebben glow in de kleur van de gekozen light.
-  */
   Widget _buildSelectedLightOnStage(double pulse) {
     final asset = _lightAsset();
     if (asset == null) return const SizedBox.shrink();
 
     final color = _selectedLightColor();
-    final glow = 0.28 + math.sin(pulse * math.pi * 2).abs() * 0.12;
+    final levelPower = _lightGlowPower();
+    final glow = (0.28 + math.sin(pulse * math.pi * 2).abs() * 0.12) *
+        levelPower;
 
     return Stack(
       children: [
@@ -1251,7 +1568,7 @@ class _StageGamePageState extends State<StageGamePage>
             color: color.withOpacity(0.10),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(glow),
+                color: color.withOpacity(glow.clamp(0.0, 0.55)),
                 blurRadius: 24,
                 spreadRadius: 6,
               ),
@@ -1268,13 +1585,6 @@ class _StageGamePageState extends State<StageGamePage>
     );
   }
 
-  /*
-    AANWIJZING:
-    Effect assets worden per type anders geplaatst:
-    - laser: meerdere laser assets met glow
-    - drone: meerdere drones die rond de stage zweven
-    - fireworks: meerdere vuurwerk bursts boven/achter de stage
-  */
   Widget _buildSelectedEffectOnStage(double pulse) {
     if (_state.selectedEffect == null) {
       return const SizedBox.shrink();
@@ -1283,10 +1593,34 @@ class _StageGamePageState extends State<StageGamePage>
     if (_state.selectedEffect == EffectOption.laser) {
       return Stack(
         children: [
-          _laserImage(left: 90, top: 128, angle: -0.55, width: 255, pulse: pulse),
-          _laserImage(right: 90, top: 128, angle: 0.55, width: 255, pulse: pulse),
-          _laserImage(left: 170, top: 176, angle: -0.25, width: 190, pulse: pulse),
-          _laserImage(right: 170, top: 176, angle: 0.25, width: 190, pulse: pulse),
+          _laserImage(
+            left: 90,
+            top: 128,
+            angle: -0.55,
+            width: 255,
+            pulse: pulse,
+          ),
+          _laserImage(
+            right: 90,
+            top: 128,
+            angle: 0.55,
+            width: 255,
+            pulse: pulse,
+          ),
+          _laserImage(
+            left: 170,
+            top: 176,
+            angle: -0.25,
+            width: 190,
+            pulse: pulse,
+          ),
+          _laserImage(
+            right: 170,
+            top: 176,
+            angle: 0.25,
+            width: 190,
+            pulse: pulse,
+          ),
           Positioned(
             top: 220,
             left: 250,
@@ -1324,10 +1658,38 @@ class _StageGamePageState extends State<StageGamePage>
 
       return Stack(
         children: [
-          _droneImage(asset, left: 118, top: 82, size: 52, pulse: pulse, phase: 0),
-          _droneImage(asset, right: 128, top: 104, size: 50, pulse: pulse, phase: 0.25),
-          _droneImage(asset, left: 260, top: 150, size: 44, pulse: pulse, phase: 0.55),
-          _droneImage(asset, right: 275, top: 152, size: 44, pulse: pulse, phase: 0.75),
+          _droneImage(
+            asset,
+            left: 118,
+            top: 82,
+            size: 52,
+            pulse: pulse,
+            phase: 0,
+          ),
+          _droneImage(
+            asset,
+            right: 128,
+            top: 104,
+            size: 50,
+            pulse: pulse,
+            phase: 0.25,
+          ),
+          _droneImage(
+            asset,
+            left: 260,
+            top: 150,
+            size: 44,
+            pulse: pulse,
+            phase: 0.55,
+          ),
+          _droneImage(
+            asset,
+            right: 275,
+            top: 152,
+            size: 44,
+            pulse: pulse,
+            phase: 0.75,
+          ),
         ],
       );
     }
@@ -1338,16 +1700,209 @@ class _StageGamePageState extends State<StageGamePage>
 
       return Stack(
         children: [
-          _fireworkImage(asset, left: 100, top: 65, size: 82, pulse: pulse, phase: 0),
-          _fireworkImage(asset, right: 110, top: 58, size: 88, pulse: pulse, phase: 0.2),
-          _fireworkImage(asset, left: 280, top: 118, size: 64, pulse: pulse, phase: 0.4),
-          _fireworkImage(asset, right: 290, top: 130, size: 64, pulse: pulse, phase: 0.6),
-          _fireworkImage(asset, left: 430, top: 185, size: 54, pulse: pulse, phase: 0.8),
+          _fireworkImage(
+            asset,
+            left: 100,
+            top: 65,
+            size: 82,
+            pulse: pulse,
+            phase: 0,
+          ),
+          _fireworkImage(
+            asset,
+            right: 110,
+            top: 58,
+            size: 88,
+            pulse: pulse,
+            phase: 0.2,
+          ),
+          _fireworkImage(
+            asset,
+            left: 280,
+            top: 118,
+            size: 64,
+            pulse: pulse,
+            phase: 0.4,
+          ),
+          _fireworkImage(
+            asset,
+            right: 290,
+            top: 130,
+            size: 64,
+            pulse: pulse,
+            phase: 0.6,
+          ),
+          _fireworkImage(
+            asset,
+            left: 430,
+            top: 185,
+            size: 54,
+            pulse: pulse,
+            phase: 0.8,
+          ),
         ],
       );
     }
 
     return const SizedBox.shrink();
+  }
+
+  Widget _buildCrowdFeedbackOnStage(double pulse) {
+    final messages = _stageFeedbackMessages();
+
+    if (messages.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Stack(
+      children: [
+        if (messages.isNotEmpty)
+          _crowdBubble(
+            text: messages[0],
+            left: 78,
+            top: 365 + math.sin(pulse * math.pi * 2) * 4,
+            color: const Color(0xFFFDFCF7),
+          ),
+        if (messages.length > 1)
+          _crowdBubble(
+            text: messages[1],
+            right: 72,
+            top: 350 + math.sin((pulse + 0.35) * math.pi * 2) * 4,
+            color: const Color(0xFFFFF2C2),
+          ),
+        if (messages.length > 2)
+          _crowdBubble(
+            text: messages[2],
+            left: 300,
+            top: 70 + math.sin((pulse + 0.7) * math.pi * 2) * 4,
+            color: const Color(0xFFE6F1E8),
+          ),
+      ],
+    );
+  }
+
+  List<String> _stageFeedbackMessages() {
+    final messages = <String>[];
+
+    if (_state.selectedSound == SoundOption.cheap) {
+      if (_state.soundControlLevel == StageControlLevel.low) {
+        messages.add('I can barely hear it!');
+      } else if (_state.soundControlLevel == StageControlLevel.medium) {
+        messages.add('Weak but usable.');
+      } else {
+        messages.add('Speaker is breaking!');
+      }
+    }
+
+    if (_state.selectedSound == SoundOption.eco) {
+      if (_state.soundControlLevel == StageControlLevel.low) {
+        messages.add('Eco sound is soft.');
+      } else if (_state.soundControlLevel == StageControlLevel.medium) {
+        messages.add('Nice clean sound!');
+      } else {
+        messages.add('Eco sound is loud!');
+      }
+    }
+
+    if (_state.selectedSound == SoundOption.pro) {
+      if (_state.soundControlLevel == StageControlLevel.low) {
+        messages.add('Clear pro sound!');
+      } else if (_state.soundControlLevel == StageControlLevel.medium) {
+        messages.add('Powerful sound!');
+      } else {
+        messages.add('Huge festival sound!');
+      }
+    }
+
+    if (_state.selectedLight == LightOption.led) {
+      if (_state.lightControlLevel == StageControlLevel.low) {
+        messages.add('LED is calm.');
+      } else if (_state.lightControlLevel == StageControlLevel.medium) {
+        messages.add('LED looks safe!');
+      } else {
+        messages.add('LED is bright!');
+      }
+    }
+
+    if (_state.selectedLight == LightOption.smart) {
+      if (_state.lightControlLevel == StageControlLevel.low) {
+        messages.add('Smart light is subtle.');
+      } else if (_state.lightControlLevel == StageControlLevel.medium) {
+        messages.add('Smart vibe!');
+      } else {
+        messages.add('Great light show!');
+      }
+    }
+
+    if (_state.selectedLight == LightOption.halogen) {
+      if (_state.lightControlLevel == StageControlLevel.high) {
+        messages.add('That light is hot!');
+      } else {
+        messages.add('Warm light!');
+      }
+    }
+
+    if (_state.currentPowerCapacity > 0 &&
+        _state.totalPowerLoad > _state.currentPowerCapacity) {
+      messages
+        ..clear()
+        ..add('Too much power!')
+        ..add('Stage is failing!')
+        ..add('Fix it fast!');
+    }
+
+    if (_logic.canFinish(_state) && messages.length < 3) {
+      messages.add('Ready for show!');
+    }
+
+    return messages.take(3).toList();
+  }
+
+  Widget _crowdBubble({
+    required String text,
+    double? left,
+    double? right,
+    required double top,
+    required Color color,
+  }) {
+    return Positioned(
+      left: left,
+      right: right,
+      top: top,
+      child: IgnorePointer(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 128),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.92),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: const Color(0xFFD8D0C2),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.caveat(
+              fontSize: 15,
+              height: 0.9,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF2F2F35),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _laserImage({
@@ -1508,161 +2063,6 @@ class _StageGamePageState extends State<StageGamePage>
     );
   }
 
-  /*
-    AANWIJZING:
-    Crowd bubbles staan nu echt in de crowd/front area.
-    Ze poppen in/out en verdwijnen zodra het probleem is opgelost.
-  */
-  List<String> _stageReactionMessages() {
-    final isOverloaded = _state.currentPowerCapacity > 0 &&
-        _state.totalPowerLoad > _state.currentPowerCapacity;
-
-    if (isOverloaded) {
-      return ['Power overload!', 'Too much power!', 'Stage is risky!'];
-    }
-
-    if (_state.selectedSound != null &&
-        _state.currentSoundDb > _logic.config.soundTargetMax) {
-      return ['Too loud!', 'My ears!', 'Lower sound!'];
-    }
-
-    if (_state.selectedSound != null &&
-        _state.currentSoundDb < _logic.config.soundTargetMin) {
-      return ['Can’t hear it!', 'More sound!'];
-    }
-
-    if (_state.selectedLight != null &&
-        _state.currentLightIntensity > _logic.config.lightTargetMax) {
-      return ['Lights too strong!', 'Too bright!', 'Dim lights!'];
-    }
-
-    if (_state.selectedLight != null &&
-        _state.currentLightIntensity < _logic.config.lightTargetMin) {
-      return ['Too dark!', 'More light!'];
-    }
-
-    if (_state.hasAllSelections) {
-      return ['Nice stage!', 'Looks good!'];
-    }
-
-    if (_state.selectedEffect != null) {
-      return ['Cool effect!'];
-    }
-
-    if (_state.selectedLight != null || _state.selectedSound != null) {
-      return ['Keep tuning!'];
-    }
-
-    return [];
-  }
-
-  Widget _buildCrowdReactionBubbles(double pulse) {
-    final messages = _stageReactionMessages();
-
-    if (messages.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final isBad = messages.first.contains('overload') ||
-        messages.first.contains('Too') ||
-        messages.first.contains('ears') ||
-        messages.first.contains('Lower') ||
-        messages.first.contains('dark') ||
-        messages.first.contains('hear') ||
-        messages.first.contains('risky') ||
-        messages.first.contains('Dim');
-
-    final positions = [
-      _BubblePosition(left: 170, bottom: 90, phase: 0.00),
-      _BubblePosition(right: 170, bottom: 86, phase: 0.28),
-      _BubblePosition(left: 340, bottom: 52, phase: 0.56),
-      _BubblePosition(right: 360, bottom: 54, phase: 0.78),
-    ];
-
-    return Stack(
-      children: [
-        for (int i = 0; i < messages.length && i < positions.length; i++)
-          _buildSingleCrowdBubble(
-            message: messages[i],
-            position: positions[i],
-            pulse: pulse,
-            isBad: isBad,
-          ),
-      ],
-    );
-  }
-
-  Widget _buildSingleCrowdBubble({
-    required String message,
-    required _BubblePosition position,
-    required double pulse,
-    required bool isBad,
-  }) {
-    final localPulse = ((pulse + position.phase) % 1.0);
-    final wave = math.sin(localPulse * math.pi);
-    final scale = 0.82 + wave * 0.18;
-    final opacity = 0.35 + wave * 0.65;
-    final yOffset = -wave * 8;
-
-    return Positioned(
-      left: position.left,
-      right: position.right,
-      bottom: position.bottom + yOffset,
-      child: Opacity(
-        opacity: opacity,
-        child: Transform.scale(
-          scale: scale,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: isBad
-                  ? const Color(0xFFFFE3DD).withOpacity(0.95)
-                  : const Color(0xFFE8F5D0).withOpacity(0.95),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color:
-                    isBad ? const Color(0xFFD26455) : const Color(0xFF6B9E66),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color:
-                      (isBad ? const Color(0xFFD26455) : const Color(0xFF6B9E66))
-                          .withOpacity(0.16 + wave * 0.10),
-                  blurRadius: 10 + wave * 4,
-                  spreadRadius: 0.4,
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isBad
-                      ? Icons.warning_amber_rounded
-                      : Icons.sentiment_satisfied_alt_rounded,
-                  size: 15,
-                  color:
-                      isBad ? const Color(0xFFD26455) : const Color(0xFF4A7C59),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  message,
-                  style: GoogleFonts.caveat(
-                    fontSize: 18,
-                    height: 0.9,
-                    fontWeight: FontWeight.w900,
-                    color: const Color(0xFF2F2F35),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildFinishButton() {
     final canFinish = _logic.canFinish(_state) && !_isEndingRound;
 
@@ -1747,6 +2147,26 @@ class _StageGamePageState extends State<StageGamePage>
               StageRightPanel(
                 state: _state,
                 config: _logic.config,
+                onSoundSliderProgressChanged: _handleLiveSoundSlider,
+                onLightSliderProgressChanged: _handleLiveLightSlider,
+                onSoundLevelChanged: (level) {
+                  setState(() {
+                    _logic.selectSoundLevel(_state, level);
+                    _liveSoundSliderProgress = _progressFromLevel(level);
+                  });
+
+                  _handleGameChange();
+                },
+                onLightLevelChanged: (level) {
+                  if (_state.selectedLight == null) return;
+
+                  setState(() {
+                    _logic.selectLightLevel(_state, level);
+                    _liveLightSliderProgress = _progressFromLevel(level);
+                  });
+
+                  _handleGameChange();
+                },
               ),
             ],
           ),
@@ -1781,18 +2201,4 @@ class _StageGamePageState extends State<StageGamePage>
       body: _buildRunningScreen(),
     );
   }
-}
-
-class _BubblePosition {
-  final double? left;
-  final double? right;
-  final double bottom;
-  final double phase;
-
-  const _BubblePosition({
-    this.left,
-    this.right,
-    required this.bottom,
-    required this.phase,
-  });
 }

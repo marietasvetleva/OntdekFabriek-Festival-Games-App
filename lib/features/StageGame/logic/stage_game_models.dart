@@ -37,6 +37,12 @@ enum StageFeedbackLevel {
   overload,
 }
 
+enum StageControlLevel {
+  low,
+  medium,
+  high,
+}
+
 class StageGameConfig {
   final double soundTargetMin;
   final double soundTargetMax;
@@ -85,6 +91,9 @@ class StageGameState {
   PowerSourceOption? selectedPowerSource;
   EffectOption? selectedEffect;
 
+  StageControlLevel soundControlLevel;
+  StageControlLevel lightControlLevel;
+
   double currentSoundDb;
   double currentLightIntensity;
   int totalPowerLoad;
@@ -109,6 +118,8 @@ class StageGameState {
     required this.selectedLight,
     required this.selectedPowerSource,
     required this.selectedEffect,
+    required this.soundControlLevel,
+    required this.lightControlLevel,
     required this.currentSoundDb,
     required this.currentLightIntensity,
     required this.totalPowerLoad,
