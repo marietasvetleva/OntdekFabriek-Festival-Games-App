@@ -61,6 +61,16 @@ class _FinalScreenState extends State<FinalScreen> {
     }
   }
 
+  void _goToSplashScreen() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SplashScreen(),
+      ),
+      (route) => false,
+    );
+  }
+
   @override
   void dispose() {
     _audioService.dispose();
@@ -93,115 +103,50 @@ class _FinalScreenState extends State<FinalScreen> {
               ),
             ),
 
-            // STAGE BACKGROUND
-            Positioned.fill(
-              child: Opacity(
-                opacity: 0.15,
-                child: Image.asset(
-                  'assets/stage.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-
-            // CONTENT
-            Center(
+            // TWO PLAYER FINAL SCREEN
+            SafeArea(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: size.width * 0.08),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                padding: const EdgeInsets.all(18),
+                child: Row(
                   children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 30,
-                        horizontal: 24,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color.fromRGBO(234, 234, 224, 0.9),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            widget.crowdReaction,
-                            style: GoogleFonts.caveat(
-                              fontSize: 52,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.black,
+                    // LEFT SIDE VIEW
+                    Expanded(
+                      child: Center(
+                        child: RotatedBox(
+                          quarterTurns: 1,
+                          child: SizedBox(
+                            width: size.height * 0.88,
+                            height: size.width * 0.43,
+                            child: _FinalResultPanel(
+                              sustainabilityScore: widget.sustainabilityScore,
+                              stabilityScore: widget.stabilityScore,
+                              audienceScore: widget.audienceScore,
+                              crowdReaction: widget.crowdReaction,
+                              endComment: widget.endComment,
+                              onPlayAgain: _goToSplashScreen,
                             ),
                           ),
-
-                          const SizedBox(height: 12),
-
-                          Text(
-                            widget.endComment,
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.caveat(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black87,
-                            ),
-                          ),
-
-                          const SizedBox(height: 24),
-
-                          _ScoreRow(
-                            label: 'Sustainability Score',
-                            value: widget.sustainabilityScore,
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          _ScoreRow(
-                            label: 'Stability Score',
-                            value: widget.stabilityScore,
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          _ScoreRow(
-                            label: 'Audience Satisfaction',
-                            value: widget.audienceScore,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
 
-                    const SizedBox(height: 30),
+                    const SizedBox(width: 16),
 
-                    // PLAY AGAIN BUTTON
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SplashScreen(),
-                          ),
-                          (route) => false,
-                        );
-                      },
-                      child: Container(
-                        width: 180,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4A7C59),
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 10,
-                              offset: Offset(0, 4),
-                            )
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Play Again',
-                            style: GoogleFonts.caveat(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
+                    // RIGHT SIDE VIEW
+                    Expanded(
+                      child: Center(
+                        child: RotatedBox(
+                          quarterTurns: 3,
+                          child: SizedBox(
+                            width: size.height * 0.88,
+                            height: size.width * 0.43,
+                            child: _FinalResultPanel(
+                              sustainabilityScore: widget.sustainabilityScore,
+                              stabilityScore: widget.stabilityScore,
+                              audienceScore: widget.audienceScore,
+                              crowdReaction: widget.crowdReaction,
+                              endComment: widget.endComment,
+                              onPlayAgain: _goToSplashScreen,
                             ),
                           ),
                         ),
@@ -214,6 +159,127 @@ class _FinalScreenState extends State<FinalScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _FinalResultPanel extends StatelessWidget {
+  final int sustainabilityScore;
+  final int stabilityScore;
+  final int audienceScore;
+  final String crowdReaction;
+  final String endComment;
+  final VoidCallback onPlayAgain;
+
+  const _FinalResultPanel({
+    required this.sustainabilityScore,
+    required this.stabilityScore,
+    required this.audienceScore,
+    required this.crowdReaction,
+    required this.endComment,
+    required this.onPlayAgain,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              vertical: 18,
+              horizontal: 18,
+            ),
+            decoration: BoxDecoration(
+              color: const Color.fromRGBO(234, 234, 224, 0.9),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  crowdReaction,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.caveat(
+                    fontSize: 42,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black,
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                Text(
+                  endComment,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.caveat(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                _ScoreRow(
+                  label: 'Sustainability Score',
+                  value: sustainabilityScore,
+                ),
+
+                const SizedBox(height: 10),
+
+                _ScoreRow(
+                  label: 'Stability Score',
+                  value: stabilityScore,
+                ),
+
+                const SizedBox(height: 10),
+
+                _ScoreRow(
+                  label: 'Audience Satisfaction',
+                  value: audienceScore,
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // PLAY AGAIN BUTTON
+        GestureDetector(
+          onTap: onPlayAgain,
+          child: Container(
+            width: 155,
+            height: 46,
+            decoration: BoxDecoration(
+              color: const Color(0xFF4A7C59),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                'Play Again',
+                style: GoogleFonts.caveat(
+                  color: Colors.white,
+                  fontSize: 21,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -231,26 +297,33 @@ class _ScoreRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+      padding: const EdgeInsets.symmetric(
+        vertical: 12,
+        horizontal: 18,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFF9DC4A8),
         borderRadius: BorderRadius.circular(30),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: GoogleFonts.caveat(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              color: Colors.black,
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.caveat(
+                fontSize: 25,
+                fontWeight: FontWeight.w800,
+                color: Colors.black,
+              ),
             ),
           ),
+          const SizedBox(width: 12),
           Text(
             value.toString(),
             style: GoogleFonts.caveat(
-              fontSize: 30,
+              fontSize: 27,
               fontWeight: FontWeight.w900,
               color: Colors.black,
             ),
