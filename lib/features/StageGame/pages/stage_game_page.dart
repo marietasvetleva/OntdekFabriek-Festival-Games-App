@@ -9,10 +9,12 @@
 // 6. Sound audio does not start automatically.
 // 7. Cheap speaker high stops clean music and plays distortion.
 // 8. FinalScreen handles cheer/boo sound.
+// 9. Speaker background music now changes based on Cheap / Eco / Pro speaker.
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 import '../services/led_service.dart';
 import '../services/stage_audio_service.dart';
@@ -33,6 +35,11 @@ class _StageGamePageState extends State<StageGamePage>
   final StageGameLogic _logic = StageGameLogic();
   final StageAudioService _audioService = StageAudioService();
 
+  // NEW:
+  // This player is only for the speaker background music.
+  // Cheap / Eco / Pro each use their own audio file.
+  final AudioPlayer _speakerBackgroundPlayer = AudioPlayer();
+
   late StageGameState _state;
 
   static const String _assetBase = 'assets/StageGameV2-image';
@@ -44,6 +51,10 @@ class _StageGamePageState extends State<StageGamePage>
   bool _audioReady = false;
   bool _backgroundMusicStarted = false;
   bool _isDistortionPlaying = false;
+
+  // NEW:
+  // Used to know if we need to switch the speaker background audio.
+  String? _currentSpeakerBackgroundAsset;
 
   double _liveSoundSliderProgress = 0.5;
   double _liveLightSliderProgress = 0.0;
@@ -65,7 +76,10 @@ class _StageGamePageState extends State<StageGamePage>
       duration: const Duration(milliseconds: 1900),
     )..repeat();
 
-    _audioService.init().then((_) {
+    Future.wait([
+      _audioService.init(),
+      _speakerBackgroundPlayer.setReleaseMode(ReleaseMode.loop),
+    ]).then((_) {
       if (!mounted) return;
       _audioReady = true;
     });
@@ -74,6 +88,7 @@ class _StageGamePageState extends State<StageGamePage>
   @override
   void dispose() {
     _stageFxController.dispose();
+    _speakerBackgroundPlayer.dispose();
     _audioService.dispose();
     super.dispose();
   }
@@ -141,15 +156,47 @@ class _StageGamePageState extends State<StageGamePage>
     });
   }
 
-  void _startBackgroundMusicIfNeeded() {
-    if (_backgroundMusicStarted) return;
+  // NEW:
+  // This connects the selected speaker option to the right background audio.
+  String? _speakerBackgroundAsset() {
+    switch (_state.selectedSound) {
+      case SoundOption.cheap:
+        return 'StageGameV2-audio/festival_background_cheap.mp3';
 
-    _audioService.startBackgroundMusic();
+      case SoundOption.eco:
+        return 'StageGameV2-audio/festival_eco.mp3';
+
+      case SoundOption.pro:
+        return 'StageGameV2-audio/festival_background_pro.mp3';
+
+      default:
+        return null;
+    }
+  }
+
+  void _startBackgroundMusicIfNeeded() async {
+    if (_state.selectedSound == null) return;
+
+    final asset = _speakerBackgroundAsset();
+    if (asset == null) return;
+
+    if (_backgroundMusicStarted && _currentSpeakerBackgroundAsset == asset) {
+      return;
+    }
+
+    await _speakerBackgroundPlayer.stop();
+    await _speakerBackgroundPlayer.play(
+      AssetSource(asset),
+      volume: _targetBackgroundVolume(),
+    );
+
+    _currentSpeakerBackgroundAsset = asset;
     _backgroundMusicStarted = true;
   }
 
-  void _stopBackgroundMusicFlagged() {
-    _audioService.stopBackgroundMusic();
+  void _stopBackgroundMusicFlagged() async {
+    await _speakerBackgroundPlayer.stop();
+    _currentSpeakerBackgroundAsset = null;
     _backgroundMusicStarted = false;
   }
 
@@ -185,7 +232,7 @@ class _StageGamePageState extends State<StageGamePage>
     return 0.0;
   }
 
-  void _startOrUpdateMusicForSelectedSpeaker() {
+  void _startOrUpdateMusicForSelectedSpeaker() async {
     if (!_audioReady || _isEndingRound) return;
 
     if (_state.selectedSound == null) {
@@ -202,8 +249,24 @@ class _StageGamePageState extends State<StageGamePage>
       return;
     }
 
-    _startBackgroundMusicIfNeeded();
-    _audioService.setBackgroundVolume(_targetBackgroundVolume());
+    _stopDistortionIfNeeded();
+
+    final asset = _speakerBackgroundAsset();
+    if (asset == null) return;
+
+    if (!_backgroundMusicStarted || _currentSpeakerBackgroundAsset != asset) {
+      await _speakerBackgroundPlayer.stop();
+      await _speakerBackgroundPlayer.play(
+        AssetSource(asset),
+        volume: _targetBackgroundVolume(),
+      );
+
+      _currentSpeakerBackgroundAsset = asset;
+      _backgroundMusicStarted = true;
+      return;
+    }
+
+    await _speakerBackgroundPlayer.setVolume(_targetBackgroundVolume());
   }
 
   void _playPrototypeAudioFeedback() {
@@ -261,7 +324,8 @@ class _StageGamePageState extends State<StageGamePage>
 
     await Future.delayed(const Duration(seconds: 7));
 
-    await _audioService.stopBackgroundMusic();
+    await _speakerBackgroundPlayer.stop();
+    _currentSpeakerBackgroundAsset = null;
     _backgroundMusicStarted = false;
 
     try {
@@ -292,7 +356,8 @@ class _StageGamePageState extends State<StageGamePage>
       _logic.finishRound(_state);
     });
 
-    await _audioService.stopBackgroundMusic();
+    await _speakerBackgroundPlayer.stop();
+    _currentSpeakerBackgroundAsset = null;
     _backgroundMusicStarted = false;
     _stopDistortionIfNeeded();
     _audioService.stopEffects();
@@ -618,8 +683,7 @@ class _StageGamePageState extends State<StageGamePage>
       ),
     );
   }
-
-  Widget _buildFestivalAssistantPanel() {
+    Widget _buildFestivalAssistantPanel() {
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -1584,8 +1648,7 @@ class _StageGamePageState extends State<StageGamePage>
       ],
     );
   }
-
-  Widget _buildSelectedEffectOnStage(double pulse) {
+    Widget _buildSelectedEffectOnStage(double pulse) {
     if (_state.selectedEffect == null) {
       return const SizedBox.shrink();
     }
