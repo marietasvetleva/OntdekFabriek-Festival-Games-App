@@ -30,12 +30,12 @@ class CompetitiveTrashSprite extends StatelessWidget {
   final Color fallbackColor;
 
   static const Color _contactTint = Color(0xFF3D2E22);
+  static const double _outlinePx = 1.0;
 
   @override
   Widget build(BuildContext context) {
     final heldLift = isHeld ? 1.05 : 1.0;
     final spawnBoost = 1.0 - spawnPhase.clamp(0.0, 1.0);
-    final showUrgency = ttlUrgency > 0.72;
 
     final sprite = Transform(
       alignment: Alignment.center,
@@ -51,6 +51,7 @@ class CompetitiveTrashSprite extends StatelessWidget {
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
+              _whiteOutline(),
               Transform.translate(
                 offset: const Offset(1.5, 2),
                 child: _silhouette(),
@@ -61,13 +62,6 @@ class CompetitiveTrashSprite extends StatelessWidget {
                   child: _SpawnLandingRing(
                     size: size,
                     progress: 1.0 - spawnBoost,
-                  ),
-                ),
-              if (showUrgency)
-                IgnorePointer(
-                  child: _UrgencyRing(
-                    size: size,
-                    strength: ((ttlUrgency - 0.72) / 0.28).clamp(0.0, 1.0),
                   ),
                 ),
             ],
@@ -92,6 +86,17 @@ class CompetitiveTrashSprite extends StatelessWidget {
           else
             sprite,
         ],
+      ),
+    );
+  }
+
+  Widget _whiteOutline() {
+    final scale = 1.0 + _outlinePx / size;
+    return Transform.scale(
+      scale: scale,
+      child: ColorFiltered(
+        colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+        child: _rawImage(filterQuality: FilterQuality.low),
       ),
     );
   }
@@ -184,31 +189,6 @@ class _SpawnLandingRing extends StatelessWidget {
   }
 }
 
-class _UrgencyRing extends StatelessWidget {
-  _UrgencyRing({required this.size, required this.strength});
-
-  final double size;
-  final double strength;
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: (0.2 + strength * 0.5).clamp(0.0, 1.0),
-      child: Container(
-        width: size * 1.06,
-        height: size * 1.06,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: const Color(0xFF6A5A48),
-            width: 2,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Minimal sprite for short deposit animations (no ground shadow stack).
 class CompetitiveTrashFxSprite extends StatelessWidget {
   CompetitiveTrashFxSprite({
@@ -228,6 +208,37 @@ class CompetitiveTrashFxSprite extends StatelessWidget {
   final double displayScale;
   final Color fallbackColor;
 
+  static const double _outlinePx = 1.0;
+
+  Widget _rawImage() {
+    return Image.asset(
+      assetPath,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.low,
+      errorBuilder: (_, __, ___) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: fallbackColor.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+    );
+  }
+
+  Widget _whiteOutline() {
+    final scale = 1.0 + _outlinePx / size;
+    return Transform.scale(
+      scale: scale,
+      child: ColorFiltered(
+        colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+        child: _rawImage(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Transform(
@@ -236,20 +247,10 @@ class CompetitiveTrashFxSprite extends StatelessWidget {
         ..rotateZ(rotationRad)
         // ignore: deprecated_member_use
         ..scale((flipX ? -1.0 : 1.0) * displayScale, displayScale),
-      child: Image.asset(
-        assetPath,
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.low,
-        errorBuilder: (_, __, ___) => Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: fallbackColor.withValues(alpha: 0.9),
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [_whiteOutline(), _rawImage()],
       ),
     );
   }

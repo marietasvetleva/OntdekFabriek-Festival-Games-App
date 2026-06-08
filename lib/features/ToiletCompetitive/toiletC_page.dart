@@ -84,6 +84,25 @@ class _WorldFx {
   final double baseSize;
 }
 
+class _TicketFallFx {
+  _TicketFallFx({
+    required this.id,
+    required this.origin,
+    required this.binColor,
+    required this.driftRight,
+    required this.startAtSec,
+    required this.fallDistance,
+  });
+
+  final String id;
+  final Offset origin;
+  final Color binColor;
+  final bool driftRight;
+  final double startAtSec;
+  final double fallDistance;
+  static const double durationSec = 1.5;
+}
+
 class _FestivalTicketPainter extends CustomPainter {
   _FestivalTicketPainter({
     required this.baseColor,
@@ -182,9 +201,9 @@ class _FestivalTicketPainter extends CustomPainter {
     canvas.drawPath(
       crack,
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.7 * crackProgress)
+        ..color = Colors.black.withValues(alpha: 0.85 * crackProgress)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
+        ..strokeWidth = 2.0
         ..strokeCap = StrokeCap.round,
     );
   }
@@ -209,157 +228,418 @@ class _HalfClipper extends CustomClipper<Rect> {
   bool shouldReclip(covariant _HalfClipper old) => old.left != left;
 }
 
-class _AnimatedTicketLife extends StatefulWidget {
+/// Static ticket icon in the HUD row (break animation runs in screen overlay).
+class _AnimatedTicketLife extends StatelessWidget {
   const _AnimatedTicketLife({
-    super.key,
-    required this.alive,
+    required this.slotIndex,
+    required this.lives,
+    required this.maxLives,
     required this.binColor,
     required this.fallLeft,
   });
 
   static const double ticketWidth = 28;
 
-  final bool alive;
+  final int slotIndex;
+  final int lives;
+  final int maxLives;
   final Color binColor;
   final bool fallLeft;
 
+  bool get _alive =>
+      fallLeft ? slotIndex < lives : slotIndex >= maxLives - lives;
+
   @override
-  State<_AnimatedTicketLife> createState() => _AnimatedTicketLifeState();
+  Widget build(BuildContext context) {
+    final w = ticketWidth;
+    final h = w * 1.3;
+    if (!_alive) {
+      return SizedBox(width: w, height: h);
+    }
+    return SizedBox(
+      width: w,
+      height: h,
+      child: CustomPaint(
+        size: Size(w, h),
+        painter: _FestivalTicketPainter(
+          baseColor: binColor,
+          goldStripe: true,
+        ),
+      ),
+    );
+  }
 }
 
-class _AnimatedTicketLifeState extends State<_AnimatedTicketLife>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  bool _dying = false;
-  bool _dead = false;
+/// Full-screen break + fall — not clipped by the ticket HUD row.
+class _TicketBreakAndFall extends StatelessWidget {
+  const _TicketBreakAndFall({
+    required this.progress,
+    required this.binColor,
+    required this.driftRight,
+    required this.fallDistance,
+  });
 
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..addStatusListener((s) {
-        if (s == AnimationStatus.completed) {
-          setState(() {
-            _dying = false;
-            _dead = true;
-          });
-        }
-      });
-    if (!widget.alive) _dead = true;
-  }
-
-  @override
-  void didUpdateWidget(covariant _AnimatedTicketLife old) {
-    super.didUpdateWidget(old);
-    if (!old.alive && widget.alive) {
-      _dying = false;
-      _dead = false;
-      _ctrl.reset();
-    } else if (old.alive && !widget.alive && !_dying) {
-      _dying = true;
-      _dead = false;
-      _ctrl.forward(from: 0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
+  final double progress;
+  final Color binColor;
+  final bool driftRight;
+  final double fallDistance;
 
   @override
   Widget build(BuildContext context) {
     final w = _AnimatedTicketLife.ticketWidth;
     final h = w * 1.3;
+    final t = progress.clamp(0.0, 1.0);
+    final dir = driftRight ? 1.0 : -1.0;
 
-    if (_dead && !_dying) {
-      return SizedBox(width: w, height: h);
-    }
-
-    if (!_dying) {
-      return SizedBox(
-        width: w,
-        height: h,
+    Widget ticketHalf({required bool left, required double crack}) {
+      return ClipRect(
+        clipper: _HalfClipper(left: left),
         child: CustomPaint(
+          size: Size(w, h),
           painter: _FestivalTicketPainter(
-            baseColor: widget.binColor,
+            baseColor: binColor,
             goldStripe: true,
+            crackProgress: crack,
           ),
         ),
       );
     }
 
+    // Phase 1 — crack + shake (0–22%)
+    if (t <= 0.22) {
+      final pt = t / 0.22;
+      final shake = sin(pt * 8 * pi) * (1 - pt) * 5.0;
+      final crack = Curves.easeIn.transform(pt);
+      return Transform.translate(
+        offset: Offset(shake, 0),
+        child: CustomPaint(
+          size: Size(w, h),
+          painter: _FestivalTicketPainter(
+            baseColor: binColor,
+            goldStripe: true,
+            crackProgress: crack,
+          ),
+        ),
+      );
+    }
+
+    // Phase 2 — peel apart, biased toward the fall direction (22–38%)
+    if (t <= 0.38) {
+      final pt = (t - 0.22) / 0.16;
+      final split = Curves.easeOutBack.transform(pt);
+      final gap = split * w * 0.3;
+      final leftPeel = driftRight ? -gap * 0.12 : -gap;
+      final rightPeel = driftRight ? gap : gap * 0.12;
+      return SizedBox(
+        width: w + gap * 2 + 8,
+        height: h,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Transform.translate(
+              offset: Offset(leftPeel, 0),
+              child: ticketHalf(left: true, crack: 1.0),
+            ),
+            Transform.translate(
+              offset: Offset(rightPeel, 0),
+              child: ticketHalf(left: false, crack: 1.0),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Phase 3 — halves fall down and drift sideways (38–100%)
+    final pt = ((t - 0.38) / 0.62).clamp(0.0, 1.0);
+    final fall = Curves.easeInCubic.transform(pt);
+    final fade = (1.0 - Curves.easeIn.transform(pt)).clamp(0.0, 1.0);
+    final gap = w * 0.3;
+    final drop = fall * fallDistance;
+    final drift = dir * fall * max(140.0, fallDistance * 0.28);
+    final rot = dir * fall * 0.65;
+
+    Widget fallingHalf({required bool left}) {
+      final peel = left
+          ? (driftRight ? -gap * 0.12 : -gap)
+          : (driftRight ? gap : gap * 0.12);
+      final halfRot = rot * (left ? 0.9 : 1.1);
+      return Transform.translate(
+        offset: Offset(peel + drift, drop),
+        child: Transform.rotate(
+          angle: halfRot,
+          alignment: left ? Alignment.centerRight : Alignment.centerLeft,
+          child: Opacity(
+            opacity: fade,
+            child: ticketHalf(left: left, crack: 1.0),
+          ),
+        ),
+      );
+    }
+
+    final maxDrift = max(140.0, fallDistance * 0.28);
+    final driftRoom = maxDrift + gap + 24;
     return SizedBox(
-      width: w,
-      height: h,
-      child: AnimatedBuilder(
-        animation: _ctrl,
-        builder: (context, _) {
-          final t = _ctrl.value;
+      width: w + driftRoom,
+      height: h + fallDistance,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: driftRight ? 0 : driftRoom - w,
+            top: 0,
+            child: fallingHalf(left: true),
+          ),
+          Positioned(
+            left: driftRight ? 0 : driftRoom - w,
+            top: 0,
+            child: fallingHalf(left: false),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-          if (t <= 0.35) {
-            final pt = t / 0.35;
-            final shake = sin(pt * 6 * pi) * (1 - pt) * 3.0;
-            final crack = Curves.easeIn.transform(pt);
-            return Transform.translate(
-              offset: Offset(shake, 0),
-              child: CustomPaint(
-                size: Size(w, h),
-                painter: _FestivalTicketPainter(
-                  baseColor: widget.binColor,
-                  goldStripe: true,
-                  crackProgress: crack,
+class _AnimatedCountdownBadge extends StatelessWidget {
+  const _AnimatedCountdownBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final flash = count == 1 ? 1.0 : (count == 2 ? 0.55 : 0.25);
+    final bgColor = Color.lerp(
+      const Color(0xFF3A6B3A),
+      const Color(0xFF5AAB5A),
+      flash,
+    )!;
+
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        color: bgColor,
+        shape: BoxShape.circle,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x44000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 350),
+        switchInCurve: Curves.easeOutBack,
+        transitionBuilder: (child, animation) {
+          final scale = Tween<double>(begin: 1.4, end: 1.0).animate(animation);
+          return ScaleTransition(
+            scale: scale,
+            child: FadeTransition(opacity: animation, child: child),
+          );
+        },
+        child: Text(
+          '$count',
+          key: ValueKey(count),
+          style: const TextStyle(
+            fontSize: 40,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFFF4F4F1),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimatedBinTimerPuck extends StatefulWidget {
+  const _AnimatedBinTimerPuck({
+    required this.progress,
+    required this.secsLeft,
+    required this.diameter,
+    required this.pulsePhase,
+  });
+
+  final double progress;
+  final int secsLeft;
+  final double diameter;
+  final double pulsePhase;
+
+  @override
+  State<_AnimatedBinTimerPuck> createState() => _AnimatedBinTimerPuckState();
+}
+
+class _AnimatedBinTimerPuckState extends State<_AnimatedBinTimerPuck>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _digitCtrl;
+  late final Animation<double> _digitScale;
+  double _milestoneBump = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _digitCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+    _digitScale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.84), weight: 35),
+      TweenSequenceItem(tween: Tween(begin: 0.84, end: 1.1), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 1.1, end: 1.0), weight: 25),
+    ]).animate(CurvedAnimation(parent: _digitCtrl, curve: Curves.easeOut));
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedBinTimerPuck oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.secsLeft != oldWidget.secsLeft) {
+      _digitCtrl.forward(from: 0);
+      if ((oldWidget.secsLeft > 30 && widget.secsLeft <= 30) ||
+          (oldWidget.secsLeft > 10 && widget.secsLeft <= 10)) {
+        _milestoneBump = 1.0;
+      }
+    }
+    if (_milestoneBump > 0) {
+      _milestoneBump = max(0.0, _milestoneBump - 0.08);
+    }
+  }
+
+  @override
+  void dispose() {
+    _digitCtrl.dispose();
+    super.dispose();
+  }
+
+  double _pulseRate() {
+    if (widget.secsLeft <= 5) return 16.0;
+    if (widget.secsLeft <= 10) return 12.0;
+    if (widget.progress < 0.25) return 9.5;
+    return 0.0;
+  }
+
+  double _pulseAmp() {
+    if (widget.secsLeft <= 5) return 0.12;
+    if (widget.secsLeft <= 10) return 0.09;
+    if (widget.progress < 0.25) return 0.06;
+    return 0.0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rate = _pulseRate();
+    final danger = rate > 0;
+    final dangerPulse =
+        danger ? 1.0 + _pulseAmp() * sin(widget.pulsePhase * rate) : 1.0;
+    final milestoneScale = 1.0 + _milestoneBump * 0.1;
+    final ringColor = Color.lerp(
+      const Color(0xFFE46C6C),
+      const Color(0xFF4FAE64),
+      widget.progress,
+    )!;
+    final tickBoost = 1.0 - _digitCtrl.value;
+    final emphasizedRing = Color.lerp(ringColor, Colors.white, tickBoost * 0.3)!;
+    final ringSize = widget.diameter * 0.84;
+    final strokeWidth = (widget.diameter * 0.10).clamp(7.0, 12.0);
+    final fontSize = (widget.diameter * 0.30).clamp(24.0, 38.0);
+    final borderColor = widget.secsLeft <= 5
+        ? const Color(0xFFA74747)
+        : widget.secsLeft <= 10
+            ? const Color(0xFFB87A30)
+            : danger
+                ? const Color(0xFFA74747)
+                : const Color(0xFF6E7A70);
+
+    return AnimatedBuilder(
+      animation: _digitCtrl,
+      builder: (context, _) {
+        return Transform.scale(
+          scale: dangerPulse * milestoneScale,
+          child: Container(
+            width: widget.diameter,
+            height: widget.diameter,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F3ED),
+              shape: BoxShape.circle,
+              border: Border.all(color: borderColor, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: danger
+                      ? const Color(0x44A74747)
+                      : const Color(0x22000000),
+                  blurRadius: danger ? 14 : 8,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-            );
-          }
-
-          final pt = ((t - 0.35) / 0.65).clamp(0.0, 1.0);
-          final eased = Curves.easeInCubic.transform(pt);
-          final dir = widget.fallLeft ? -1.0 : 1.0;
-          final fade = (1.0 - Curves.easeIn.transform(pt)).clamp(0.0, 1.0);
-
-          Widget halfPiece({required bool left}) {
-            final dx = dir * eased * w * (left ? 0.7 : 1.1);
-            final dy = eased * w * (left ? 0.4 : 0.6);
-            final rot = dir * eased * (left ? -0.35 : 0.45);
-            return Positioned.fill(
-              child: Transform(
-                alignment:
-                    left ? Alignment.centerRight : Alignment.centerLeft,
-                transform: Matrix4.identity()
-                  ..translate(dx, dy)
-                  ..rotateZ(rot),
-                child: Opacity(
-                  opacity: fade,
-                  child: ClipRect(
-                    clipper: _HalfClipper(left: left),
-                    child: CustomPaint(
-                      size: Size(w, h),
-                      painter: _FestivalTicketPainter(
-                        baseColor: widget.binColor,
-                        goldStripe: true,
-                        crackProgress: 1.0,
-                      ),
+              ],
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: ringSize,
+                  height: ringSize,
+                  child: CircularProgressIndicator(
+                    value: widget.progress,
+                    strokeWidth: strokeWidth,
+                    backgroundColor: const Color(0xFFD8DED4),
+                    valueColor: AlwaysStoppedAnimation<Color>(emphasizedRing),
+                  ),
+                ),
+                Transform.scale(
+                  scale: _digitScale.value,
+                  child: Text(
+                    '${widget.secsLeft}',
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.w800,
+                      color: danger
+                          ? const Color(0xFFA74747)
+                          : const Color(0xFF1E2A1F),
                     ),
                   ),
                 ),
-              ),
-            );
-          }
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
 
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              halfPiece(left: true),
-              halfPiece(left: false),
-            ],
-          );
-        },
-      ),
+/// Festival arena backdrop for intro and results — same art as gameplay.
+class _FestivalSplitLobby extends StatelessWidget {
+  const _FestivalSplitLobby({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const Positioned.fill(
+          child: ColoredBox(color: ToiletCompetitiveArenaLayout.edgeFillColor),
+        ),
+        Positioned.fill(
+          child: Image.asset(
+            ToiletCompetitiveArenaLayout.arenaAsset,
+            fit: BoxFit.fitWidth,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (_, __, ___) => const ColoredBox(
+              color: Color(0xFFD4C4A8),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: ColoredBox(
+            color: const Color(0xFF1A1408).withValues(alpha: 0.08),
+          ),
+        ),
+        Positioned.fill(child: child),
+      ],
     );
   }
 }
@@ -380,9 +660,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   static const String _bucketAssetLeft = 'assets/ToiletCompetitive/bucket_left.png';
   static const String _bucketAssetRight = 'assets/ToiletCompetitive/bucket_right.png';
   /// Bundled assets — Mixkit preview URLs fail on Flutter web (format error).
-  static const String _sfxGoodCatch = 'trashGame/audio/binnedTrash.mp3';
-  static const String _sfxBadCatch = 'trashGame/audio/appear.mp3';
-  static const String _sfxRoundEnd = 'ToiletImage/WinToilet.mp3';
+  static const String _sfxDeposit = 'trashGame/audio/binnedTrash.mp3';
+  static const String _sfxRoundEnd = 'ToiletImage/GoodToilet.mp3';
 
   final AudioPlayer _audioPlayer = AudioPlayer();
   final ToiletCompetitiveLogic _logic = ToiletCompetitiveLogic();
@@ -392,8 +671,10 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   final Map<int, int> _pointerOwnerById = {};
   final List<_DepositFx> _depositFx = [];
   final List<_WorldFx> _worldFx = [];
+  final List<_TicketFallFx> _ticketFallFx = [];
   int _depositFxCounter = 0;
   int _worldFxCounter = 0;
+  int _ticketFallFxCounter = 0;
   double _p1BucketBump = 0;
   double _p2BucketBump = 0;
 
@@ -406,6 +687,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   int? _countdown;
   ArenaLayoutTune? _layoutTune;
   bool _layoutEditorEnabled = false;
+  bool _finishScheduled = false;
 
   /// Hot-reload on web can leave this unset when State fields change.
   ArenaLayoutTune get _effectiveLayoutTune =>
@@ -449,9 +731,11 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     _frameTimer?.cancel();
     setState(() {
       _phase = _GamePhase.running;
+      _finishScheduled = false;
       _layouts.clear();
       _depositFx.clear();
       _worldFx.clear();
+      _ticketFallFx.clear();
       _p1BucketBump = 0;
       _p2BucketBump = 0;
       _logic.start(_gameState);
@@ -475,11 +759,12 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         _syncLayoutsForActiveItems(_playArea(size));
         _pruneFinishedDepositFx();
         _pruneWorldFx();
+        _pruneTicketFallFx();
         _decayBucketBumps(dt);
       });
 
       if (_gameState.finished) {
-        _finishGame();
+        _scheduleFinishGame();
       }
     });
   }
@@ -506,8 +791,32 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   void _finishGame() {
     if (_phase == _GamePhase.results) return;
     _frameTimer?.cancel();
-    _safePlaySfx(_sfxRoundEnd);
+    _finishScheduled = false;
+    _playRoundEndSfx();
     setState(() => _phase = _GamePhase.results);
+  }
+
+  void _scheduleFinishGame() {
+    if (_phase == _GamePhase.results || _finishScheduled) return;
+    _finishScheduled = true;
+    Future.delayed(const Duration(milliseconds: 1600), () {
+      if (!mounted || _phase == _GamePhase.results) return;
+      if (_gameState.finished) {
+        _finishGame();
+      } else {
+        _finishScheduled = false;
+      }
+    });
+  }
+
+  Future<void> _playRoundEndSfx() async {
+    try {
+      await _safePlaySfx(_sfxRoundEnd, volume: 0.7);
+    } finally {
+      try {
+        await _audioPlayer.setVolume(1.0);
+      } catch (_) {}
+    }
   }
 
   _PlayerRoundResult _roundResultFor(CompetitivePlayerId playerId) {
@@ -522,12 +831,14 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     _countdownTimer?.cancel();
     setState(() {
       _phase = _GamePhase.intro;
+      _finishScheduled = false;
       _p1Ready = false;
       _p2Ready = false;
       _countdown = null;
       _layouts.clear();
       _depositFx.clear();
       _worldFx.clear();
+      _ticketFallFx.clear();
       _p1BucketBump = 0;
       _p2BucketBump = 0;
       _gameState = _logic.createInitialState();
@@ -541,62 +852,42 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     // Full width (same as intro) — rotated sides need half-screen width as
     // their layout height; a narrow card causes bottom overflow.
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F4F1),
       body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              color: const Color(0xFF2D3A2E),
-              child: const Text(
-                'Round complete',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Color(0xFFF4F4F1),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
+        child: _FestivalSplitLobby(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _resultPlayerSide(
+                  color: const Color(0xFFAEDC9B),
+                  bgGradient: const [
+                    Color(0xFFE8F5E3),
+                    Color(0xFFC8E6C0),
+                  ],
+                  quarterTurns: 1,
+                  result: _roundResultFor(CompetitivePlayerId.p1),
+                  player: p1,
+                  opponent: p2,
+                  onPlayAgain: _returnToIntroLobby,
                 ),
               ),
-            ),
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: _resultPlayerSide(
-                      color: const Color(0xFFAEDC9B),
-                      bgGradient: const [
-                        Color(0xFFE8F5E3),
-                        Color(0xFFC8E6C0),
-                      ],
-                      quarterTurns: 1,
-                      result: _roundResultFor(CompetitivePlayerId.p1),
-                      player: p1,
-                      opponent: p2,
-                      onPlayAgain: _returnToIntroLobby,
-                    ),
-                  ),
-                  Container(width: 2, color: const Color(0xFFB8C5B0)),
-                  Expanded(
-                    child: _resultPlayerSide(
-                      color: const Color(0xFFFFC16A),
-                      bgGradient: const [
-                        Color(0xFFFFF3E0),
-                        Color(0xFFFFE0B2),
-                      ],
-                      quarterTurns: 3,
-                      result: _roundResultFor(CompetitivePlayerId.p2),
-                      player: p2,
-                      opponent: p1,
-                      onPlayAgain: _returnToIntroLobby,
-                    ),
-                  ),
-                ],
+              Container(width: 2, color: const Color(0xFFB8C5B0)),
+              Expanded(
+                child: _resultPlayerSide(
+                  color: const Color(0xFFFFC16A),
+                  bgGradient: const [
+                    Color(0xFFFFF3E0),
+                    Color(0xFFFFE0B2),
+                  ],
+                  quarterTurns: 3,
+                  result: _roundResultFor(CompetitivePlayerId.p2),
+                  player: p2,
+                  opponent: p1,
+                  onPlayAgain: _returnToIntroLobby,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -714,7 +1005,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           constraints: const BoxConstraints(maxWidth: 320),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.82),
+            color: const Color(0xFFF0F3ED).withValues(alpha: 0.92),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: color.withValues(alpha: 0.55), width: 1.5),
           ),
@@ -773,7 +1064,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: bgGradient,
+          colors: bgGradient
+              .map((c) => c.withValues(alpha: 0.50))
+              .toList(growable: false),
         ),
       ),
       child: RotatedBox(
@@ -852,6 +1145,100 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     if (_worldFx.isEmpty) return;
     final now = _gameState.elapsedSec;
     _worldFx.removeWhere((fx) => now - fx.startAtSec >= fx.durationSec);
+  }
+
+  void _pruneTicketFallFx() {
+    if (_ticketFallFx.isEmpty) return;
+    final now = _gameState.elapsedSec;
+    _ticketFallFx.removeWhere(
+      (fx) => now - fx.startAtSec >= _TicketFallFx.durationSec,
+    );
+  }
+
+  double _ticketHudWidth() {
+    const pad = 6.0;
+    const ticketPad = 2.0;
+    const ticketW = _AnimatedTicketLife.ticketWidth;
+    final maxL = _logic.config.startLives;
+    return pad * 2 + maxL * (ticketW + ticketPad * 2);
+  }
+
+  Offset _ticketOriginForSlot({
+    required Size screenSize,
+    required int player,
+    required int slotIndex,
+  }) {
+    const hudInset = 8.0;
+    const panelPadH = 6.0;
+    const panelPadV = 5.0;
+    const ticketPad = 2.0;
+    const ticketW = _AnimatedTicketLife.ticketWidth;
+    final ticketSpan = ticketW + ticketPad * 2;
+
+    final y = hudInset + panelPadV;
+    if (player == 1) {
+      return Offset(
+        hudInset + panelPadH + slotIndex * ticketSpan + ticketPad,
+        y,
+      );
+    }
+    final hudWidth = _ticketHudWidth();
+    return Offset(
+      screenSize.width - hudInset - hudWidth + slotIndex * ticketSpan + ticketPad,
+      y,
+    );
+  }
+
+  void _spawnTicketFallFx({
+    required int player,
+    required int slotIndex,
+    required Color binColor,
+    required bool driftRight,
+    required Size screenSize,
+  }) {
+    _ticketFallFx.add(
+      _TicketFallFx(
+        id: 'ticket_fall_${_ticketFallFxCounter++}',
+        origin: _ticketOriginForSlot(
+          screenSize: screenSize,
+          player: player,
+          slotIndex: slotIndex,
+        ),
+        binColor: binColor,
+        driftRight: driftRight,
+        startAtSec: _gameState.elapsedSec,
+        fallDistance: screenSize.height * 0.72,
+      ),
+    );
+  }
+
+  List<Widget> _ticketFallFxWidgets(Size screenSize) {
+    if (_ticketFallFx.isEmpty) return const [];
+    final now = _gameState.elapsedSec;
+    final widgets = <Widget>[];
+
+    for (final fx in _ticketFallFx) {
+      final progress =
+          ((now - fx.startAtSec) / _TicketFallFx.durationSec).clamp(0.0, 1.0);
+      if (progress >= 1.0) continue;
+
+      widgets.add(
+        Positioned(
+          left: fx.origin.dx - 40,
+          top: fx.origin.dy,
+          child: IgnorePointer(
+            child: _TicketBreakAndFall(
+              progress: progress,
+              binColor: fx.binColor,
+              driftRight: fx.driftRight,
+              fallDistance: fx.fallDistance,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return widgets;
   }
 
   void _decayBucketBumps(double dt) {
@@ -1139,15 +1526,34 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         continue;
       }
 
+      final penalizedId = _bucketOwnerToPlayerId(bucketOwner);
+      final livesBefore = _gameState.players[penalizedId]!.lives;
       final outcome = _logic.depositItem(
         state: _gameState,
-        playerId: _bucketOwnerToPlayerId(bucketOwner),
+        playerId: penalizedId,
         itemId: spawn.id,
       );
 
+      if (outcome == DepositOutcome.wrong) {
+        final playerState = _gameState.players[penalizedId]!;
+        if (playerState.lives < livesBefore) {
+          final maxL = _logic.config.startLives;
+          final lostSlot = penalizedId == CompetitivePlayerId.p1
+              ? playerState.lives
+              : maxL - playerState.lives - 1;
+          _spawnTicketFallFx(
+            player: penalizedId == CompetitivePlayerId.p1 ? 1 : 2,
+            slotIndex: lostSlot,
+            binColor: _binTintFor(playerState.binType),
+            driftRight: playerState.binType == BinType.organic,
+            screenSize: size,
+          );
+        }
+      }
+
       switch (outcome) {
         case DepositOutcome.correct:
-          _safePlaySfx(_sfxGoodCatch);
+          _safePlaySfx(_sfxDeposit);
           _spawnDepositFx(
             item: spawn,
             assetPath:
@@ -1162,7 +1568,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           );
           break;
         case DepositOutcome.wrong:
-          _safePlaySfx(_sfxBadCatch);
+          _safePlaySfx(_sfxDeposit);
           _spawnDepositFx(
             item: spawn,
             assetPath:
@@ -1188,12 +1594,13 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     });
 
     if (_gameState.finished) {
-      _finishGame();
+      _scheduleFinishGame();
     }
   }
 
-  Future<void> _safePlaySfx(String assetPath) async {
+  Future<void> _safePlaySfx(String assetPath, {double volume = 1.0}) async {
     try {
+      await _audioPlayer.setVolume(volume);
       await _audioPlayer.stop();
       await _audioPlayer.play(AssetSource(assetPath));
     } catch (_) {
@@ -1218,156 +1625,193 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
     final Widget statusBadge;
     if (countdown != null) {
-      statusBadge = Container(
-        width: 72,
-        height: 72,
-        decoration: BoxDecoration(
-          color: const Color(0xFF3A6B3A),
-          shape: BoxShape.circle,
-          boxShadow: const [
-            BoxShadow(color: Color(0x44000000), blurRadius: 10, offset: Offset(0, 3)),
-          ],
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          '$countdown',
-          style: const TextStyle(
-            fontSize: 40,
-            fontWeight: FontWeight.w900,
-            color: Color(0xFFF4F4F1),
-          ),
-        ),
-      );
+      statusBadge = _AnimatedCountdownBadge(count: countdown);
     } else {
       statusBadge = Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
           color: otherReady
-              ? const Color(0xFF3A6B3A)
+              ? const Color(0xFF3A8B44)
               : const Color(0xFF2D3A2E),
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: const Color(0xFFF0F3ED).withValues(alpha: 0.35),
+            width: 1.5,
+          ),
           boxShadow: const [
-            BoxShadow(color: Color(0x33000000), blurRadius: 6, offset: Offset(0, 2)),
+            BoxShadow(
+              color: Color(0x55000000),
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
           ],
         ),
         child: Text(
           statusText,
           style: const TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w800,
             color: Color(0xFFF4F4F1),
-            letterSpacing: 0.3,
+            letterSpacing: 0.4,
           ),
         ),
       );
     }
 
-    final content = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          playerLabel,
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF1E2A1F),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          '$binLabel bin',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: color.computeLuminance() > 0.5
-                ? const Color(0xFF3A5A30)
-                : const Color(0xFF6B4400),
-            letterSpacing: 0.4,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(maxLives, (i) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: SizedBox(
-                width: 32,
-                height: 32 * 1.3,
-                child: CustomPaint(
-                  painter: _FestivalTicketPainter(
-                    baseColor: color,
-                    goldStripe: true,
+    final joinButton = isReady
+        ? Container(
+            key: const ValueKey('ready'),
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F3ED),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFF3A8B44), width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3A8B44).withValues(alpha: 0.45),
+                  blurRadius: 14,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle_rounded,
+                    color: Color(0xFF3A8B44), size: 26),
+                SizedBox(width: 10),
+                Text(
+                  'Ready!',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF1E2A1F),
+                    letterSpacing: 0.3,
                   ),
+                ),
+              ],
+            ),
+          )
+        : FilledButton(
+            key: const ValueKey('join'),
+            onPressed: onReady,
+            style: FilledButton.styleFrom(
+              backgroundColor: color,
+              foregroundColor: const Color(0xFF1E2A1F),
+              padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 16),
+              elevation: 6,
+              shadowColor: Colors.black.withValues(alpha: 0.35),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(
+                  color: const Color(0xFF1E2A1F).withValues(alpha: 0.25),
+                  width: 2,
                 ),
               ),
-            );
-          }),
+            ),
+            child: const Text(
+              'Join!',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.4,
+              ),
+            ),
+          );
+
+    final content = Container(
+      constraints: const BoxConstraints(maxWidth: 340),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F3ED).withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFF6E7A70).withValues(alpha: 0.45),
+          width: 1.5,
         ),
-        const SizedBox(height: 20),
-        Text(
-          instruction,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 14,
-            height: 1.5,
-            color: Color(0xFF3A3A3A),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x44000000),
+            blurRadius: 16,
+            offset: Offset(0, 4),
           ),
-        ),
-        const SizedBox(height: 28),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: isReady
-              ? Container(
-                  key: const ValueKey('ready'),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 28, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: color, width: 2),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle, color: color, size: 22),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Ready!',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: color.computeLuminance() > 0.5
-                              ? const Color(0xFF2A4A20)
-                              : const Color(0xFF6B4400),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : ElevatedButton(
-                  key: const ValueKey('join'),
-                  onPressed: onReady,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: color,
-                    foregroundColor: const Color(0xFF1E2A1F),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 32, vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    elevation: 3,
-                  ),
-                  child: const Text(
-                    'Join!',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            playerLabel,
+            style: const TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF1E2A1F),
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: color, width: 1.5),
+            ),
+            child: Text(
+              '$binLabel bin',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E2A1F),
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(maxLives, (i) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: SizedBox(
+                  width: 32,
+                  height: 32 * 1.3,
+                  child: CustomPaint(
+                    painter: _FestivalTicketPainter(
+                      baseColor: color,
+                      goldStripe: true,
                     ),
                   ),
                 ),
-        ),
-      ],
+              );
+            }),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            instruction,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.55,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1E2A1F),
+            ),
+          ),
+          const SizedBox(height: 24),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 350),
+            switchInCurve: Curves.easeOutBack,
+            transitionBuilder: (child, animation) {
+              return ScaleTransition(
+                scale: Tween<double>(begin: 0.88, end: 1.0).animate(animation),
+                child: FadeTransition(opacity: animation, child: child),
+              );
+            },
+            child: joinButton,
+          ),
+        ],
+      ),
     );
 
     return Container(
@@ -1375,7 +1819,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: bgGradient,
+          colors: bgGradient
+              .map((c) => c.withValues(alpha: 0.50))
+              .toList(growable: false),
         ),
       ),
       child: RotatedBox(
@@ -1426,6 +1872,30 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
   }
 
+  Widget _ticketHud(int lives, BinType binType, {required bool fallLeft}) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F3ED).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0xFF6E7A70).withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x44000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        child: _tickets(lives, binType, fallLeft: fallLeft),
+      ),
+    );
+  }
+
   Widget _tickets(int lives, BinType binType, {required bool fallLeft}) {
     final maxL = _logic.config.startLives;
     final color = _binTintFor(binType);
@@ -1433,85 +1903,17 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(maxL, (i) {
-        final alive = fallLeft ? i < lives : i >= (maxL - lives);
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: _AnimatedTicketLife(
-            key: ValueKey('ticket_${fallLeft ? "p1" : "p2"}_$i'),
-            alive: alive,
+            slotIndex: i,
+            lives: lives,
+            maxLives: maxL,
             binColor: color,
             fallLeft: fallLeft,
           ),
         );
       }),
-    );
-  }
-
-  Widget _binTimerPuck({
-    required double progress,
-    required int secsLeft,
-    required double diameter,
-    required double pulsePhase,
-  }) {
-    final danger = progress < 0.25;
-    final dangerPulse =
-        danger ? 1.0 + 0.06 * sin(pulsePhase * 9.5) : 1.0;
-    final ringColor = Color.lerp(
-      const Color(0xFFE46C6C),
-      const Color(0xFF4FAE64),
-      progress,
-    )!;
-    final ringSize = diameter * 0.84;
-    final strokeWidth = (diameter * 0.10).clamp(7.0, 12.0);
-    final fontSize = (diameter * 0.30).clamp(24.0, 38.0);
-
-    return Transform.scale(
-      scale: dangerPulse,
-      child: Container(
-        width: diameter,
-        height: diameter,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF0F3ED),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: danger ? const Color(0xFFA74747) : const Color(0xFF6E7A70),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: danger
-                  ? const Color(0x44A74747)
-                  : const Color(0x22000000),
-              blurRadius: danger ? 14 : 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            SizedBox(
-              width: ringSize,
-              height: ringSize,
-              child: CircularProgressIndicator(
-                value: progress,
-                strokeWidth: strokeWidth,
-                backgroundColor: const Color(0xFFD8DED4),
-                valueColor: AlwaysStoppedAnimation<Color>(ringColor),
-              ),
-            ),
-            Text(
-              '$secsLeft',
-              style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w800,
-                color:
-                    danger ? const Color(0xFFA74747) : const Color(0xFF1E2A1F),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1559,7 +1961,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       final popScale =
           _spawnStartScale +
           (1.0 - _spawnStartScale) * Curves.easeOutBack.transform(popT);
-      final spawnOpacity = Curves.easeOut.transform(popT);
+      final spawnOpacity =
+          max(0.9, Curves.easeOut.transform(popT));
       final spawnPhase =
           (activeAge / _spawnSettleDurationSec).clamp(0.0, 1.0);
       final ttlUrgency = _logic.itemAgeProgress(_gameState, item);
@@ -1803,9 +2206,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
     if (_phase == _GamePhase.intro) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF4F4F1),
         body: SafeArea(
-          child: Row(
+          child: _FestivalSplitLobby(
+            child: Row(
             children: [
               Expanded(
                 child: _introPlayerSide(
@@ -1853,6 +2256,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 ),
               ),
             ],
+            ),
           ),
         ),
       );
@@ -1887,21 +2291,11 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
             ),
           ),
         Positioned(
-          left: 8,
-          top: max(8.0, playArea.top - 8),
-          child: _tickets(p1.lives, p1.binType, fallLeft: true),
-        ),
-        Positioned(
-          right: 8,
-          top: max(8.0, playArea.top - 8),
-          child: _tickets(p2.lives, p2.binType, fallLeft: false),
-        ),
-        Positioned(
           top: max(12.0, playArea.top - timerDiameter - 12),
           left: 0,
           right: 0,
           child: Center(
-            child: _binTimerPuck(
+            child: _AnimatedBinTimerPuck(
               progress: timerProgress,
               secsLeft: secsLeft,
               diameter: timerDiameter,
@@ -1912,6 +2306,17 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         ..._itemWidgets(),
         ..._worldFxWidgets(),
         ..._depositFxWidgets(),
+        Positioned(
+          top: 8,
+          left: 8,
+          child: _ticketHud(p1.lives, p1.binType, fallLeft: true),
+        ),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: _ticketHud(p2.lives, p2.binType, fallLeft: false),
+        ),
+        ..._ticketFallFxWidgets(size),
         if (kDebugMode && _layoutEditorEnabled)
           ToiletCompetitiveLayoutEditor(
             screenSize: size,
