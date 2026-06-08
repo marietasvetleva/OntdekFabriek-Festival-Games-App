@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import 'toiletC_arena_layout.dart';
@@ -20,10 +22,16 @@ class ToiletCompetitiveArenaScene extends StatelessWidget {
     required this.binTintFor,
     required this.scoreBadge,
     required this.layoutTune,
+    required this.worldTimeSec,
+    this.p1BucketBump = 0,
+    this.p2BucketBump = 0,
   });
 
   final Size screenSize;
   final ArenaLayoutTune layoutTune;
+  final double worldTimeSec;
+  final double p1BucketBump;
+  final double p2BucketBump;
   final Rect p1Bucket;
   final Rect p2Bucket;
   final int p1Score;
@@ -46,6 +54,7 @@ class ToiletCompetitiveArenaScene extends StatelessWidget {
       required int score,
       required int player,
       required int quarterTurns,
+      required double bump,
     }) {
       final pit = ToiletCompetitiveArenaLayout.binPitRect(
         screenSize,
@@ -59,13 +68,19 @@ class ToiletCompetitiveArenaScene extends StatelessWidget {
         player,
         _tune,
       );
+      final idleBob = sin(worldTimeSec * 1.65 + player * 1.7) * 2.2;
+      final bumpKick = bump * sin(bump * pi * 2.2) * 10;
+      final squash = 1.0 - bump * 0.06;
 
       return Positioned(
         left: topLeft.dx,
-        top: topLeft.dy,
+        top: topLeft.dy + idleBob + bumpKick,
         width: size.width,
         height: size.height,
-        child: Stack(
+        child: Transform.scale(
+          scaleY: squash,
+          alignment: Alignment.bottomCenter,
+          child: Stack(
           clipBehavior: Clip.none,
           children: [
             Image.asset(
@@ -92,6 +107,7 @@ class ToiletCompetitiveArenaScene extends StatelessWidget {
               ),
             ),
           ],
+        ),
         ),
       );
     }
@@ -127,6 +143,7 @@ class ToiletCompetitiveArenaScene extends StatelessWidget {
           score: p1Score,
           player: 1,
           quarterTurns: 1,
+          bump: p1BucketBump,
         ),
         bucketAt(
           bucketRect: p2Bucket,
@@ -135,6 +152,7 @@ class ToiletCompetitiveArenaScene extends StatelessWidget {
           score: p2Score,
           player: 2,
           quarterTurns: 3,
+          bump: p2BucketBump,
         ),
       ],
     );

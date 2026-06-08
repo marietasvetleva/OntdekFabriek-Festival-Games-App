@@ -10,12 +10,15 @@ import 'toiletC_arena_layout.dart';
 import 'toiletC_arena_layout_editor.dart';
 import 'toiletC_arena_layout_tune.dart';
 import 'toiletC_arena_scene.dart';
+import 'toiletC_item_sprite.dart';
 import 'toiletC_logic.dart';
 import 'toiletC_models.dart';
 import 'toiletC_movement.dart';
+import 'toiletC_world_fx.dart';
 
 enum _GamePhase { intro, running, results }
 enum _DepositFxType { vacuum, reject }
+enum _WorldFxKind { missed, score }
 enum _PlayerRoundResult { win, lose, draw }
 
 class _ItemLayout {
@@ -61,6 +64,24 @@ class _DepositFx {
   final double artScale;
   final double baseRotationRad;
   final bool flipX;
+}
+
+class _WorldFx {
+  _WorldFx({
+    required this.id,
+    required this.kind,
+    required this.center,
+    required this.startAtSec,
+    required this.durationSec,
+    this.baseSize = 120,
+  });
+
+  final String id;
+  final _WorldFxKind kind;
+  final Offset center;
+  final double startAtSec;
+  final double durationSec;
+  final double baseSize;
 }
 
 class _FestivalTicketPainter extends CustomPainter {
@@ -353,16 +374,15 @@ class ToiletCompetitivePage extends StatefulWidget {
 class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   static const double _itemMinSize = 120;
   static const double _itemStartSize = 148;
-  static const double _spawnPopDurationSec = 0.24;
-  static const double _spawnStartScale = 0.72;
+  static const double _spawnPopDurationSec = 0.42;
+  static const double _spawnSettleDurationSec = 0.55;
+  static const double _spawnStartScale = 0.68;
   static const String _bucketAssetLeft = 'assets/ToiletCompetitive/bucket_left.png';
   static const String _bucketAssetRight = 'assets/ToiletCompetitive/bucket_right.png';
-  static const String _sfxGoodCatch =
-      'https://assets.mixkit.co/active_storage/sfx/270/270-preview.mp3';
-  static const String _sfxBadCatch =
-      'https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3';
-  static const String _sfxRoundEnd =
-      'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3';
+  /// Bundled assets — Mixkit preview URLs fail on Flutter web (format error).
+  static const String _sfxGoodCatch = 'trashGame/audio/binnedTrash.mp3';
+  static const String _sfxBadCatch = 'trashGame/audio/appear.mp3';
+  static const String _sfxRoundEnd = 'ToiletImage/WinToilet.mp3';
 
   final AudioPlayer _audioPlayer = AudioPlayer();
   final ToiletCompetitiveLogic _logic = ToiletCompetitiveLogic();
@@ -371,7 +391,11 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   final Map<String, _ItemLayout> _layouts = {};
   final Map<int, int> _pointerOwnerById = {};
   final List<_DepositFx> _depositFx = [];
+  final List<_WorldFx> _worldFx = [];
   int _depositFxCounter = 0;
+  int _worldFxCounter = 0;
+  double _p1BucketBump = 0;
+  double _p2BucketBump = 0;
 
   Timer? _frameTimer;
   Timer? _countdownTimer;
@@ -427,6 +451,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       _phase = _GamePhase.running;
       _layouts.clear();
       _depositFx.clear();
+      _worldFx.clear();
+      _p1BucketBump = 0;
+      _p2BucketBump = 0;
       _logic.start(_gameState);
     });
 
@@ -436,9 +463,19 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       const dt = 16 / 1000;
 
       setState(() {
+        final prevIds = _gameState.activeItems.map((e) => e.id).toSet();
         _logic.tick(_gameState, dt);
+        for (final id in prevIds) {
+          if (_gameState.activeItems.any((e) => e.id == id)) continue;
+          final layout = _layouts[id];
+          if (layout == null) continue;
+          final sz = layout.frozenSize ?? _itemStartSize;
+          _spawnMissedItemFx(center: _itemCenter(layout, sz), baseSize: sz);
+        }
         _syncLayoutsForActiveItems(_playArea(size));
         _pruneFinishedDepositFx();
+        _pruneWorldFx();
+        _decayBucketBumps(dt);
       });
 
       if (_gameState.finished) {
@@ -490,6 +527,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       _countdown = null;
       _layouts.clear();
       _depositFx.clear();
+      _worldFx.clear();
+      _p1BucketBump = 0;
+      _p2BucketBump = 0;
       _gameState = _logic.createInitialState();
     });
   }
@@ -808,15 +848,66 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     _depositFx.removeWhere((fx) => now - fx.startAtSec >= fx.durationSec);
   }
 
+  void _pruneWorldFx() {
+    if (_worldFx.isEmpty) return;
+    final now = _gameState.elapsedSec;
+    _worldFx.removeWhere((fx) => now - fx.startAtSec >= fx.durationSec);
+  }
+
+  void _decayBucketBumps(double dt) {
+    _p1BucketBump = max(0, _p1BucketBump - dt * 4.2);
+    _p2BucketBump = max(0, _p2BucketBump - dt * 4.2);
+  }
+
+  void _pulseBucket(int bucketOwner) {
+    if (bucketOwner == 1) {
+      _p1BucketBump = 1;
+    } else {
+      _p2BucketBump = 1;
+    }
+  }
+
+  void _spawnMissedItemFx({
+    required Offset center,
+    required double baseSize,
+  }) {
+    final now = _gameState.elapsedSec;
+    _worldFx.add(
+      _WorldFx(
+        id: 'miss_${_worldFxCounter++}',
+        kind: _WorldFxKind.missed,
+        center: center,
+        startAtSec: now,
+        durationSec: 0.55,
+        baseSize: baseSize,
+      ),
+    );
+  }
+
+  void _spawnScorePopupFx({required Offset center}) {
+    final now = _gameState.elapsedSec;
+    _worldFx.add(
+      _WorldFx(
+        id: 'score_${_worldFxCounter++}',
+        kind: _WorldFxKind.score,
+        center: center,
+        startAtSec: now,
+        durationSec: 0.75,
+      ),
+    );
+  }
+
   void _spawnDepositFx({
     required CompetitiveItemSpawn item,
     required String assetPath,
     required Offset startCenter,
     required Offset targetCenter,
     required DepositOutcome outcome,
+    required int bucketOwner,
   }) {
     final now = _gameState.elapsedSec;
     final isCorrect = outcome == DepositOutcome.correct;
+    _pulseBucket(bucketOwner);
     final direction = (targetCenter - startCenter);
     final directionNorm = direction.distance <= 0.001
         ? const Offset(1, 0)
@@ -841,6 +932,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         flipX: item.spawnFlipX,
       ),
     );
+    if (isCorrect) {
+      _spawnScorePopupFx(center: targetCenter);
+    }
   }
 
   String _assetForItem(CompetitiveItemSpawn item) {
@@ -917,20 +1011,20 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     required double rotationRad,
     required bool flipX,
     required double displayScale,
+    double spawnPhase = 1,
+    double ttlUrgency = 0,
+    bool isHeld = false,
   }) {
-    return Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.identity()
-        ..rotateZ(rotationRad)
-        ..scale((flipX ? -1.0 : 1.0) * displayScale, displayScale),
-      child: _imageOrFallback(
-        path: path,
-        width: size,
-        height: size,
-        fallbackColor: fallbackColor,
-        shape: BoxShape.circle,
-        fit: BoxFit.contain,
-      ),
+    return CompetitiveTrashSprite(
+      assetPath: path,
+      size: size,
+      rotationRad: rotationRad,
+      flipX: flipX,
+      displayScale: displayScale,
+      spawnPhase: spawnPhase,
+      ttlUrgency: ttlUrgency,
+      isHeld: isHeld,
+      fallbackColor: fallbackColor,
     );
   }
 
@@ -999,8 +1093,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       layout!.x = clamped.dx;
       layout.y = clamped.dy;
     }
-
-    setState(() {});
+    // Positions refresh on the 16ms game tick — avoids rebuilding the
+    // whole tree on every pointer-move event (major lag with many items).
   }
 
   void _releaseDraggedItems({
@@ -1064,6 +1158,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 ? _rectCenter(p1CatchRect)
                 : _rectCenter(p2CatchRect),
             outcome: outcome,
+            bucketOwner: bucketOwner,
           );
           break;
         case DepositOutcome.wrong:
@@ -1078,6 +1173,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 ? _rectCenter(p1CatchRect)
                 : _rectCenter(p2CatchRect),
             outcome: outcome,
+            bucketOwner: bucketOwner,
           );
           break;
         case DepositOutcome.ignored:
@@ -1098,60 +1194,12 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
   Future<void> _safePlaySfx(String assetPath) async {
     try {
-      final isUrl =
-          assetPath.startsWith('http://') || assetPath.startsWith('https://');
-
-      if (isUrl) {
-        await _audioPlayer.play(UrlSource(assetPath));
-      } else {
-        await _audioPlayer.play(AssetSource(assetPath));
-      }
-    } catch (_) {}
-  }
-
-  Widget _imageOrFallback({
-    required String path,
-    required double width,
-    required double height,
-    required Color fallbackColor,
-    BoxShape shape = BoxShape.rectangle,
-    BoxFit fit = BoxFit.contain,
-    Alignment alignment = Alignment.center,
-    bool flipX = false,
-  }) {
-    final image = Image.asset(
-      path,
-      width: width,
-      height: height,
-      fit: fit,
-      alignment: alignment,
-      errorBuilder: (_, __, ___) {
-        return Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            color: fallbackColor,
-            shape: shape,
-            borderRadius:
-                shape == BoxShape.rectangle ? BorderRadius.circular(14) : null,
-          ),
-        );
-      },
-    );
-
-    if (shape == BoxShape.circle) {
-      return ClipOval(child: image);
+      await _audioPlayer.stop();
+      await _audioPlayer.play(AssetSource(assetPath));
+    } catch (_) {
+      // Missing asset or web audio blocked — game continues without sound.
     }
-
-    if (!flipX) return image;
-
-    return Transform(
-      alignment: Alignment.center,
-      transform: Matrix4.rotationY(pi),
-      child: image,
-    );
   }
-
 
   Widget _introPlayerSide({
     required String playerLabel,
@@ -1403,8 +1451,11 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     required double progress,
     required int secsLeft,
     required double diameter,
+    required double pulsePhase,
   }) {
     final danger = progress < 0.25;
+    final dangerPulse =
+        danger ? 1.0 + 0.06 * sin(pulsePhase * 9.5) : 1.0;
     final ringColor = Color.lerp(
       const Color(0xFFE46C6C),
       const Color(0xFF4FAE64),
@@ -1414,48 +1465,84 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final strokeWidth = (diameter * 0.10).clamp(7.0, 12.0);
     final fontSize = (diameter * 0.30).clamp(24.0, 38.0);
 
-    return Container(
-      width: diameter,
-      height: diameter,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F3ED),
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: danger ? const Color(0xFFA74747) : const Color(0xFF6E7A70),
-          width: 2,
+    return Transform.scale(
+      scale: dangerPulse,
+      child: Container(
+        width: diameter,
+        height: diameter,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F3ED),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: danger ? const Color(0xFFA74747) : const Color(0xFF6E7A70),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: danger
+                  ? const Color(0x44A74747)
+                  : const Color(0x22000000),
+              blurRadius: danger ? 14 : 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          SizedBox(
-            width: ringSize,
-            height: ringSize,
-            child: CircularProgressIndicator(
-              value: progress,
-              strokeWidth: strokeWidth,
-              backgroundColor: const Color(0xFFD8DED4),
-              valueColor: AlwaysStoppedAnimation<Color>(ringColor),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              width: ringSize,
+              height: ringSize,
+              child: CircularProgressIndicator(
+                value: progress,
+                strokeWidth: strokeWidth,
+                backgroundColor: const Color(0xFFD8DED4),
+                valueColor: AlwaysStoppedAnimation<Color>(ringColor),
+              ),
             ),
-          ),
-          Text(
-            '$secsLeft',
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.w800,
-              color: danger ? const Color(0xFFA74747) : const Color(0xFF1E2A1F),
+            Text(
+              '$secsLeft',
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w800,
+                color:
+                    danger ? const Color(0xFFA74747) : const Color(0xFF1E2A1F),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  List<Widget> _worldFxWidgets() {
+    if (_worldFx.isEmpty) return const [];
+    final now = _gameState.elapsedSec;
+    final widgets = <Widget>[];
+
+    for (final fx in _worldFx) {
+      final progress =
+          ((now - fx.startAtSec) / fx.durationSec).clamp(0.0, 1.0);
+      switch (fx.kind) {
+        case _WorldFxKind.missed:
+          widgets.add(
+            CompetitiveMissedItemFx(
+              center: fx.center,
+              progress: progress,
+              baseSize: fx.baseSize,
+            ),
+          );
+        case _WorldFxKind.score:
+          widgets.add(
+            CompetitiveScorePopupFx(
+              center: fx.center,
+              progress: progress,
+            ),
+          );
+      }
+    }
+
+    return widgets;
   }
 
   List<Widget> _itemWidgets() {
@@ -1473,13 +1560,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           _spawnStartScale +
           (1.0 - _spawnStartScale) * Curves.easeOutBack.transform(popT);
       final spawnOpacity = Curves.easeOut.transform(popT);
-      final phase = (item.id.hashCode % 360) * (pi / 180.0);
-      final wobbleX = item.isBeingHeld
-          ? 0.0
-          : sin(_gameState.elapsedSec * 4.4 + phase) * 3.0;
-      final wobbleY = item.isBeingHeld
-          ? 0.0
-          : cos(_gameState.elapsedSec * 3.5 + phase) * 2.0;
+      final spawnPhase =
+          (activeAge / _spawnSettleDurationSec).clamp(0.0, 1.0);
+      final ttlUrgency = _logic.itemAgeProgress(_gameState, item);
 
       widgets.add(
         Positioned(
@@ -1487,9 +1570,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           top: layout.y,
           width: sz,
           height: sz,
-          child: Transform.translate(
-            offset: Offset(wobbleX, wobbleY),
-            child: Opacity(
+          child: Opacity(
               opacity: spawnOpacity,
               child: _orientedItemArt(
                 path: _assetForItem(item),
@@ -1498,8 +1579,10 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 rotationRad: item.spawnRotationRad,
                 flipX: item.spawnFlipX,
                 displayScale: scale * popScale,
+                spawnPhase: spawnPhase,
+                ttlUrgency: ttlUrgency,
+                isHeld: item.isBeingHeld,
               ),
-            ),
           ),
         ),
       );
@@ -1559,8 +1642,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           height: fxSize,
           child: Opacity(
             opacity: opacity.clamp(0.0, 1.0),
-            child: _orientedItemArt(
-              path: fx.assetPath,
+            child: CompetitiveTrashFxSprite(
+              assetPath: fx.assetPath,
               size: fxSize,
               fallbackColor: fx.fallbackColor,
               rotationRad: rotation,
@@ -1711,6 +1794,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       1.0,
     );
     final timerDiameter = (size.shortestSide * 0.12).clamp(96.0, 120.0);
+    final anyItemHeld =
+        _gameState.activeItems.any((item) => item.isBeingHeld);
 
     if (_phase == _GamePhase.results) {
       return _buildResultsScreen();
@@ -1789,7 +1874,18 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           binTintFor: _binTintFor,
           scoreBadge: _scoreBadge,
           layoutTune: _effectiveLayoutTune,
+          worldTimeSec: _gameState.elapsedSec,
+          p1BucketBump: _p1BucketBump,
+          p2BucketBump: _p2BucketBump,
         ),
+        if (anyItemHeld)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ColoredBox(
+                color: const Color(0xFF1A1408).withValues(alpha: 0.07),
+              ),
+            ),
+          ),
         Positioned(
           left: 8,
           top: max(8.0, playArea.top - 8),
@@ -1809,10 +1905,12 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
               progress: timerProgress,
               secsLeft: secsLeft,
               diameter: timerDiameter,
+              pulsePhase: _gameState.elapsedSec,
             ),
           ),
         ),
         ..._itemWidgets(),
+        ..._worldFxWidgets(),
         ..._depositFxWidgets(),
         if (kDebugMode && _layoutEditorEnabled)
           ToiletCompetitiveLayoutEditor(
