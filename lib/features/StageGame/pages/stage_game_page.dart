@@ -1842,6 +1842,8 @@ Widget _buildSelectedEffectOnStage(double pulse) {
       left: left,
       right: right,
       top: top,
+      child: Transform.rotate(
+        angle: -1.57,
       child: IgnorePointer(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 128),
@@ -1875,7 +1877,9 @@ Widget _buildSelectedEffectOnStage(double pulse) {
           ),
         ),
       ),
+    ),
     );
+  
   }
 
   Widget _laserImage({
