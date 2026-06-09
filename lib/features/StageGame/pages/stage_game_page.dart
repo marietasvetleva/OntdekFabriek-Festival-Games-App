@@ -411,15 +411,17 @@ class _StageGamePageState extends State<StageGamePage>
   }
 
   String _powerSourceLabel(PowerSourceOption option) {
-    switch (option) {
-      case PowerSourceOption.solar:
-        return 'Solar';
-      case PowerSourceOption.hybrid:
-        return 'Hybrid';
-      case PowerSourceOption.generator:
-        return 'Generator';
-    }
+  switch (option) {
+    case PowerSourceOption.solar:
+      return 'Solar';
+
+    case PowerSourceOption.hybrid:
+      return 'Hybrid';
+
+    case PowerSourceOption.generator:
+      return 'Generator';
   }
+}
 
   String _effectOptionLabel(EffectOption option) {
     switch (option) {
@@ -1518,108 +1520,103 @@ class _StageGamePageState extends State<StageGamePage>
     );
   }
 
-  Widget _buildSelectedPowerOnStage(double pulse) {
-    final asset = _powerAsset();
-    if (asset == null) return const SizedBox.shrink();
+Widget _buildSelectedPowerOnStage(double pulse) {
+  final asset = _powerAsset();
+  if (asset == null) return const SizedBox.shrink();
 
-    return Positioned(
-      left: 72,
-      bottom: 95,
+  return Positioned(
+    left: 230, 
+    top: 390, 
+    child: Transform.rotate(
+      angle: -1.57,
       child: _stageAssetImage(
         asset: asset,
-        size: 72,
+        size: 135,
         pulse: pulse,
         label: _state.selectedPowerSource == null
             ? null
             : _powerSourceLabel(_state.selectedPowerSource!),
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildSelectedSoundOnStage(double pulse) {
-    final asset = _soundAsset();
-    if (asset == null) return const SizedBox.shrink();
+Widget _buildSelectedSoundOnStage(double pulse) {
+  final asset = _soundAsset();
+  if (asset == null) return const SizedBox.shrink();
 
-    final isDistorted = _state.selectedSound == SoundOption.cheap &&
-        _state.soundControlLevel == StageControlLevel.high;
+  final isDistorted = _state.selectedSound == SoundOption.cheap &&
+      _state.soundControlLevel == StageControlLevel.high;
 
-    final shake = isDistorted ? math.sin(pulse * math.pi * 16) * 5 : 0.0;
-    final rotate = isDistorted ? math.sin(pulse * math.pi * 14) * 0.05 : 0.0;
-    final size = _state.selectedSound == SoundOption.pro ? 76.0 : 70.0;
+  final shake = isDistorted ? math.sin(pulse * math.pi * 16) * 5 : 0.0;
+  final rotate = isDistorted ? math.sin(pulse * math.pi * 14) * 0.05 : 0.0;
+  final size = _state.selectedSound == SoundOption.pro ? 145.0 : 135.0;
 
-    return Stack(
-      children: [
-        Positioned(
-          left: 135 + shake,
-          top: 215 + math.sin(pulse * math.pi * 2) * 2,
-          child: Transform.rotate(
-            angle: rotate,
-            child: _stageAssetImage(
-              asset: asset,
-              size: size,
-              pulse: pulse,
-            ),
+  return Stack(
+    children: [
+      Positioned(
+        left: 315 + shake,
+        top: 120 + math.sin(pulse * math.pi * 2) * 2,
+        child: Transform.rotate(
+          angle: rotate - 1.57,
+          child: _stageAssetImage(asset: asset, size: size, pulse: pulse),
+        ),
+      ),
+      Positioned(
+        left: 260 - shake,
+        top: 365 + math.sin((pulse + 0.3) * math.pi * 2) * 2,
+        child: Transform.rotate(
+          angle: rotate - 1.57,
+          child: _stageAssetImage(asset: asset, size: size, pulse: pulse),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildSelectedLightOnStage(double pulse) {
+  final asset = _lightAsset();
+  if (asset == null) return const SizedBox.shrink();
+
+  final color = _selectedLightColor();
+  final levelPower = _lightGlowPower();
+  final glow = (0.28 + math.sin(pulse * math.pi * 2).abs() * 0.12) *
+      levelPower;
+
+  return Stack(
+    children: [
+      Positioned(
+        left: 250,
+        top: 40,
+        child: Transform.rotate(
+          angle: -1.57,
+          child: _lightRigAsset(asset, color, glow, size: 140),
+        ),
+      ),
+      Positioned(
+        left: 290,
+        top: 120,
+        child: Transform.rotate(
+          angle: -1.57,
+          child: _lightRigAsset(asset, color, glow * 0.8, size: 120),
           ),
         ),
-        Positioned(
-          right: 135 - shake,
-          top: 215 + math.sin((pulse + 0.3) * math.pi * 2) * 2,
-          child: Transform.scale(
-            scaleX: -1,
-            child: Transform.rotate(
-              angle: -rotate,
-              child: _stageAssetImage(
-                asset: asset,
-                size: size,
-                pulse: pulse,
-              ),
-            ),
-          ),
+      Positioned(
+        left: 220,
+        top: 220,
+        child: Transform.rotate(
+          angle: -1.57,
+          child: _lightRigAsset(asset, color, glow * 0.8, size: 120),
         ),
-      ],
-    );
-  }
-
-  Widget _buildSelectedLightOnStage(double pulse) {
-    final asset = _lightAsset();
-    if (asset == null) return const SizedBox.shrink();
-
-    final color = _selectedLightColor();
-    final levelPower = _lightGlowPower();
-    final glow = (0.28 + math.sin(pulse * math.pi * 2).abs() * 0.12) *
-        levelPower;
-
-    return Stack(
-      children: [
-        Positioned(
-          left: 180,
-          top: 58,
-          child: _lightRigAsset(asset, color, glow),
-        ),
-        Positioned(
-          right: 180,
-          top: 58,
-          child: _lightRigAsset(asset, color, glow),
-        ),
-        Positioned(
-          left: 250,
-          top: 112,
-          child: _lightRigAsset(asset, color, glow * 0.8, size: 48),
-        ),
-        Positioned(
-          right: 250,
-          top: 112,
-          child: _lightRigAsset(asset, color, glow * 0.8, size: 48),
-        ),
-      ],
-    );
-  }
-
+      ),
+    ],
+  );
+}
   Widget _lightRigAsset(
     String asset,
     Color color,
     double glow, {
-    double size = 58,
+    double size = 82,
   }) {
     return Stack(
       alignment: Alignment.center,
@@ -1648,167 +1645,80 @@ class _StageGamePageState extends State<StageGamePage>
       ],
     );
   }
-    Widget _buildSelectedEffectOnStage(double pulse) {
-    if (_state.selectedEffect == null) {
-      return const SizedBox.shrink();
-    }
-
-    if (_state.selectedEffect == EffectOption.laser) {
-      return Stack(
-        children: [
-          _laserImage(
-            left: 90,
-            top: 128,
-            angle: -0.55,
-            width: 255,
-            pulse: pulse,
-          ),
-          _laserImage(
-            right: 90,
-            top: 128,
-            angle: 0.55,
-            width: 255,
-            pulse: pulse,
-          ),
-          _laserImage(
-            left: 170,
-            top: 176,
-            angle: -0.25,
-            width: 190,
-            pulse: pulse,
-          ),
-          _laserImage(
-            right: 170,
-            top: 176,
-            angle: 0.25,
-            width: 190,
-            pulse: pulse,
-          ),
-          Positioned(
-            top: 220,
-            left: 250,
-            right: 250,
-            child: Container(
-              height: 4,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(99),
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    const Color(0xFF58E28B).withOpacity(0.65),
-                    const Color(0xFFB8FFD2).withOpacity(0.75),
-                    const Color(0xFF58E28B).withOpacity(0.65),
-                    Colors.transparent,
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF58E28B).withOpacity(0.40),
-                    blurRadius: 18,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    if (_state.selectedEffect == EffectOption.drone) {
-      final asset = _effectAsset();
-      if (asset == null) return const SizedBox.shrink();
-
-      return Stack(
-        children: [
-          _droneImage(
-            asset,
-            left: 118,
-            top: 82,
-            size: 52,
-            pulse: pulse,
-            phase: 0,
-          ),
-          _droneImage(
-            asset,
-            right: 128,
-            top: 104,
-            size: 50,
-            pulse: pulse,
-            phase: 0.25,
-          ),
-          _droneImage(
-            asset,
-            left: 260,
-            top: 150,
-            size: 44,
-            pulse: pulse,
-            phase: 0.55,
-          ),
-          _droneImage(
-            asset,
-            right: 275,
-            top: 152,
-            size: 44,
-            pulse: pulse,
-            phase: 0.75,
-          ),
-        ],
-      );
-    }
-
-    if (_state.selectedEffect == EffectOption.fireworks) {
-      final asset = _effectAsset();
-      if (asset == null) return const SizedBox.shrink();
-
-      return Stack(
-        children: [
-          _fireworkImage(
-            asset,
-            left: 100,
-            top: 65,
-            size: 82,
-            pulse: pulse,
-            phase: 0,
-          ),
-          _fireworkImage(
-            asset,
-            right: 110,
-            top: 58,
-            size: 88,
-            pulse: pulse,
-            phase: 0.2,
-          ),
-          _fireworkImage(
-            asset,
-            left: 280,
-            top: 118,
-            size: 64,
-            pulse: pulse,
-            phase: 0.4,
-          ),
-          _fireworkImage(
-            asset,
-            right: 290,
-            top: 130,
-            size: 64,
-            pulse: pulse,
-            phase: 0.6,
-          ),
-          _fireworkImage(
-            asset,
-            left: 430,
-            top: 185,
-            size: 54,
-            pulse: pulse,
-            phase: 0.8,
-          ),
-        ],
-      );
-    }
-
+Widget _buildSelectedEffectOnStage(double pulse) {
+  if (_state.selectedEffect == null) {
     return const SizedBox.shrink();
   }
+
+  if (_state.selectedEffect == EffectOption.laser) {
+    return Stack(
+      children: [
+        _laserImage(
+          left: 220,
+          top: 40,
+          angle: 0.65 - 1.57,
+          width: 230,
+          pulse: pulse,
+        ),
+
+        _laserImage(
+          left: 260,
+          top: 70,
+          angle: 0.45 - 1.57,
+          width: 210,
+          pulse: pulse,
+        ),
+
+        _laserImage(
+          left: 300,
+          top: 100,
+          angle: 0.25 - 1.57,
+          width: 200,
+          pulse: pulse,
+        ),
+
+      _laserImage(
+        left: 340,
+        top: 130,
+        angle: 0.10 - 1.57,
+        width: 185,
+        pulse: pulse,
+      ),
+    ],
+  );
+  }
+
+  if (_state.selectedEffect == EffectOption.drone) {
+    final asset = _effectAsset();
+    if (asset == null) return const SizedBox.shrink();
+
+    return Stack(
+      children: [
+        _droneImage(asset, left: 370, top: 85, size: 125, pulse: pulse, phase: 0),
+        _droneImage(asset, left: 240, top: 360, size: 120, pulse: pulse, phase: 0.25),
+        _droneImage(asset, left: 430, top: 190, size: 110, pulse: pulse, phase: 0.55),
+        _droneImage(asset, left: 235, top: 235, size: 110, pulse: pulse, phase: 0.75),
+      ],
+    );
+  }
+
+  if (_state.selectedEffect == EffectOption.fireworks) {
+    final asset = _effectAsset();
+    if (asset == null) return const SizedBox.shrink();
+
+    return Stack(
+      children: [
+        _fireworkImage(asset, left: 345, top: 55, size: 170, pulse: pulse, phase: 0),
+        _fireworkImage(asset, left: 215, top: 335, size: 180, pulse: pulse, phase: 0.2),
+        _fireworkImage(asset, left: 420, top: 170, size: 145, pulse: pulse, phase: 0.4),
+        _fireworkImage(asset, left: 230, top: 220, size: 145, pulse: pulse, phase: 0.6),
+        _fireworkImage(asset, left: 330, top: 270, size: 125, pulse: pulse, phase: 0.8),
+      ],
+    );
+  }
+
+  return const SizedBox.shrink();
+}
 
   Widget _buildCrowdFeedbackOnStage(double pulse) {
     final messages = _stageFeedbackMessages();
@@ -2037,7 +1947,7 @@ class _StageGamePageState extends State<StageGamePage>
       right: right,
       top: top + y,
       child: Transform.rotate(
-        angle: angle,
+        angle: angle - 1.57,
         child: Image.asset(
           asset,
           width: size,
@@ -2070,11 +1980,14 @@ class _StageGamePageState extends State<StageGamePage>
         opacity: opacity,
         child: Transform.scale(
           scale: scale,
-          child: Image.asset(
-            asset,
-            width: size,
-            height: size,
-            fit: BoxFit.contain,
+          child: Transform.rotate(
+            angle: -1.57,
+            child: Image.asset(
+              asset,
+              width: size,
+              height: size,
+              fit: BoxFit.contain,
+            ),
           ),
         ),
       ),
