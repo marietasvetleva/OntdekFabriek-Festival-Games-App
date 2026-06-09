@@ -28,6 +28,8 @@ class _FinalScreenState extends State<FinalScreen> {
   final StageAudioService _audioService = StageAudioService();
 
   bool _soundPlayed = false;
+  bool _leftPlayAgainReady = false;
+  bool _rightPlayAgainReady = false;
 
   @override
   void initState() {
@@ -61,14 +63,40 @@ class _FinalScreenState extends State<FinalScreen> {
     }
   }
 
-  void _goToSplashScreen() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const SplashScreen(),
-      ),
-      (route) => false,
-    );
+  void _setLeftPlayAgainReady() {
+    if (_leftPlayAgainReady) return;
+
+    setState(() {
+      _leftPlayAgainReady = true;
+    });
+
+    _checkBothPlayAgainReady();
+  }
+
+  void _setRightPlayAgainReady() {
+    if (_rightPlayAgainReady) return;
+
+    setState(() {
+      _rightPlayAgainReady = true;
+    });
+
+    _checkBothPlayAgainReady();
+  }
+
+  void _checkBothPlayAgainReady() {
+    if (!_leftPlayAgainReady || !_rightPlayAgainReady) return;
+
+    Future.delayed(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const SplashScreen(),
+        ),
+        (route) => false,
+      );
+    });
   }
 
   @override
@@ -89,7 +117,6 @@ class _FinalScreenState extends State<FinalScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // FRAME
             Positioned(
               top: -60,
               left: -55,
@@ -103,27 +130,26 @@ class _FinalScreenState extends State<FinalScreen> {
               ),
             ),
 
-            // TWO PLAYER FINAL SCREEN
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(18),
                 child: Row(
                   children: [
-                    // LEFT SIDE VIEW
                     Expanded(
                       child: Center(
                         child: RotatedBox(
                           quarterTurns: 1,
                           child: SizedBox(
-                            width: size.height * 0.88,
-                            height: size.width * 0.43,
+                            width: size.height * 0.78,
+                            height: size.width * 0.36,
                             child: _FinalResultPanel(
                               sustainabilityScore: widget.sustainabilityScore,
                               stabilityScore: widget.stabilityScore,
                               audienceScore: widget.audienceScore,
                               crowdReaction: widget.crowdReaction,
                               endComment: widget.endComment,
-                              onPlayAgain: _goToSplashScreen,
+                              isPlayAgainReady: _leftPlayAgainReady,
+                              onPlayAgainReady: _setLeftPlayAgainReady,
                             ),
                           ),
                         ),
@@ -132,21 +158,21 @@ class _FinalScreenState extends State<FinalScreen> {
 
                     const SizedBox(width: 16),
 
-                    // RIGHT SIDE VIEW
                     Expanded(
                       child: Center(
                         child: RotatedBox(
                           quarterTurns: 3,
                           child: SizedBox(
-                            width: size.height * 0.88,
-                            height: size.width * 0.43,
+                            width: size.height * 0.78,
+                            height: size.width * 0.36,
                             child: _FinalResultPanel(
                               sustainabilityScore: widget.sustainabilityScore,
                               stabilityScore: widget.stabilityScore,
                               audienceScore: widget.audienceScore,
                               crowdReaction: widget.crowdReaction,
                               endComment: widget.endComment,
-                              onPlayAgain: _goToSplashScreen,
+                              isPlayAgainReady: _rightPlayAgainReady,
+                              onPlayAgainReady: _setRightPlayAgainReady,
                             ),
                           ),
                         ),
@@ -169,7 +195,8 @@ class _FinalResultPanel extends StatelessWidget {
   final int audienceScore;
   final String crowdReaction;
   final String endComment;
-  final VoidCallback onPlayAgain;
+  final bool isPlayAgainReady;
+  final VoidCallback onPlayAgainReady;
 
   const _FinalResultPanel({
     required this.sustainabilityScore,
@@ -177,7 +204,8 @@ class _FinalResultPanel extends StatelessWidget {
     required this.audienceScore,
     required this.crowdReaction,
     required this.endComment,
-    required this.onPlayAgain,
+    required this.isPlayAgainReady,
+    required this.onPlayAgainReady,
   });
 
   @override
@@ -189,8 +217,8 @@ class _FinalResultPanel extends StatelessWidget {
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(
-              vertical: 18,
-              horizontal: 18,
+              vertical: 16,
+              horizontal: 16,
             ),
             decoration: BoxDecoration(
               color: const Color.fromRGBO(234, 234, 224, 0.9),
@@ -203,42 +231,34 @@ class _FinalResultPanel extends StatelessWidget {
                   crowdReaction,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.caveat(
-                    fontSize: 42,
+                    fontSize: 38,
                     fontWeight: FontWeight.w900,
                     color: Colors.black,
                   ),
                 ),
-
-                const SizedBox(height: 6),
-
+                const SizedBox(height: 4),
                 Text(
                   endComment,
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.caveat(
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: Colors.black87,
                   ),
                 ),
-
-                const SizedBox(height: 18),
-
+                const SizedBox(height: 14),
                 _ScoreRow(
                   label: 'Sustainability Score',
                   value: sustainabilityScore,
                 ),
-
-                const SizedBox(height: 10),
-
+                const SizedBox(height: 8),
                 _ScoreRow(
                   label: 'Stability Score',
                   value: stabilityScore,
                 ),
-
-                const SizedBox(height: 10),
-
+                const SizedBox(height: 8),
                 _ScoreRow(
                   label: 'Audience Satisfaction',
                   value: audienceScore,
@@ -248,16 +268,18 @@ class _FinalResultPanel extends StatelessWidget {
           ),
         ),
 
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
 
-        // PLAY AGAIN BUTTON
         GestureDetector(
-          onTap: onPlayAgain,
-          child: Container(
-            width: 155,
-            height: 46,
+          onTap: isPlayAgainReady ? null : onPlayAgainReady,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            width: 160,
+            height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFF4A7C59),
+              color: isPlayAgainReady
+                  ? const Color(0xFF3F6F4A)
+                  : const Color(0xFF4A7C59),
               borderRadius: BorderRadius.circular(30),
               boxShadow: const [
                 BoxShadow(
@@ -269,10 +291,10 @@ class _FinalResultPanel extends StatelessWidget {
             ),
             child: Center(
               child: Text(
-                'Play Again',
+                isPlayAgainReady ? '✓ Ready' : 'Play Again',
                 style: GoogleFonts.caveat(
                   color: Colors.white,
-                  fontSize: 21,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -298,8 +320,8 @@ class _ScoreRow extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
-        vertical: 12,
-        horizontal: 18,
+        vertical: 10,
+        horizontal: 16,
       ),
       decoration: BoxDecoration(
         color: const Color(0xFF9DC4A8),
@@ -313,17 +335,17 @@ class _ScoreRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.caveat(
-                fontSize: 25,
+                fontSize: 23,
                 fontWeight: FontWeight.w800,
                 color: Colors.black,
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Text(
             value.toString(),
             style: GoogleFonts.caveat(
-              fontSize: 27,
+              fontSize: 25,
               fontWeight: FontWeight.w900,
               color: Colors.black,
             ),
