@@ -38,7 +38,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
       backgroundColor: const Color(0xffececec),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(12),
           child: Container(
             decoration: BoxDecoration(
               color: const Color(0xffdce8dd),
@@ -52,9 +52,9 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                     characterImage:
                         'assets/StageGameV2-image/firstcharacter.png',
                     initialText:
-                        'Hello! I am Mike, nice to meet you.'
-                        'For this game, I am a Personal Assistant'
-                        ' for festival stage. Do you what it means?',
+                        'Hello! I am Mike, nice to meet you. '
+                        'For this game, I am a Personal Assistant '
+                        'for festival stage. Do you know what it means?',
                     explainText:
                         'Don\'t worry — I\'ll make sure no one misses a thing. '
                         'Your job is to organize the event timeline and keep things running smoothly.',
@@ -69,9 +69,9 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                     characterImage:
                         'assets/StageGameV2-image/secondcharacter.png',
                     initialText:
-                        'Hi, I am Nick, what’s up?'
-                        'Also for this game I am Stage Builder for this'
-                        'game stage.Do you know what it means?',
+                        'Hi, I am Nick, what\'s up? '
+                        'Also for this game I am Stage Builder for this '
+                        'game stage. Do you know what it means?',
                     explainText:
                         'Now comes the hard part. As the stage builder, '
                         'you must control the lights, sound and energy '
@@ -101,38 +101,39 @@ class SpeechCloud extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
-          width: 410,
-          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 26),
+          width: 680, // mare
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 46),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(90),
-            border: Border.all(color: Colors.black87, width: 2.5),
+            borderRadius: BorderRadius.circular(60),
+            border: Border.all(color: Colors.black87, width: 3),
           ),
           child: Text(
             text,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 15,
               color: Colors.black87,
-              height: 1.5,
+              height: 1.6,
             ),
           ),
         ),
+        // Coada stil "thought bubble" — 3 cercuri descrescătoare
         Padding(
-          padding: const EdgeInsets.only(left: 20),
+          padding: const EdgeInsets.only(left: 24, top: 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _bubble(9),
-              const SizedBox(height: 3),
+              _bubble(10),
+              const SizedBox(height: 4),
               Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: _bubble(6),
+                padding: const EdgeInsets.only(left: 10),
+                child: _bubble(7),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 4),
               Padding(
-                padding: const EdgeInsets.only(left: 14),
-                child: _bubble(4),
+                padding: const EdgeInsets.only(left: 18),
+                child: _bubble(5),
               ),
             ],
           ),
@@ -186,7 +187,7 @@ class _RoleSectionState extends State<_RoleSection>
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true); // pulsează continuu
+    )..repeat(reverse: true);
     _glowAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
@@ -204,99 +205,121 @@ class _RoleSectionState extends State<_RoleSection>
         ? widget.explainText
         : widget.initialText;
 
+    // ── Buton START — verde cu border radius si shadow ──
     final Widget startButton = GestureDetector(
       onTap: widget.isReady ? null : widget.onReady,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        color: widget.isReady
-            ? const Color(0xff6b0000) // mai închis când e apăsat
-            : const Color(0xff9c0000),
-        child: const Text(
-          'Start',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
+        width: 58,
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        decoration: BoxDecoration(
+          color: widget.isReady
+              ? const Color(0xff2e5e38)
+              : const Color(0xff3d7a4a),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: RotatedBox(
+          quarterTurns: widget.isLeft ? 1 : 3,
+          child: Text(
+            widget.isReady ? 'Ready!' : 'Start',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
     );
 
+    // ── Buton EXPLAIN MORE — verde deschis cu border radius ──
     final Widget explainButton = GestureDetector(
       onTap: () => setState(() => _showExplain = !_showExplain),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        color: _showExplain ? const Color(0xff4a7a54) : const Color(0xff6d9f77),
-        child: const Text(
-          '? Explain More',
-          style: TextStyle(color: Colors.black87, fontSize: 13),
+        width: 58,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: _showExplain
+              ? const Color(0xff4a7a54)
+              : const Color(0xff5a8f64),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: RotatedBox(
+          quarterTurns: widget.isLeft ? 1 : 3,
+          child: Text(
+            _showExplain ? '✕ Close' : '? Explain More',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ),
     );
 
-    // Personaj — pulsează dacă isReady, altfel normal
     Widget character = RotatedBox(
       quarterTurns: widget.isLeft ? 1 : 3,
-      child: SizedBox(width: 300, child: Image.asset(widget.characterImage)),
+      child: SizedBox(
+        width: 680,
+        child: Image.asset(widget.characterImage, fit: BoxFit.contain),
+      ),
     );
 
     if (widget.isReady) {
       character = AnimatedBuilder(
         animation: _glowAnimation,
-        builder: (context, child) {
-          return Container(
-            decoration: BoxDecoration(
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.yellowAccent.withOpacity(
-                    0.7 * _glowAnimation.value,
-                  ),
-                  blurRadius: 40 * _glowAnimation.value,
-                  spreadRadius: 15 * _glowAnimation.value,
+        builder: (context, child) => Container(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.yellowAccent.withOpacity(
+                  0.7 * _glowAnimation.value,
                 ),
-              ],
-            ),
-            child: child,
-          );
-        },
+                blurRadius: 50 * _glowAnimation.value,
+                spreadRadius: 20 * _glowAnimation.value,
+              ),
+            ],
+          ),
+          child: child,
+        ),
         child: character,
       );
     }
 
     return Stack(
       children: [
-        /// Personaj
+        // ── Personaj — colț exterior, lipit sus/jos și stânga/dreapta ──
         Positioned(
-          left: widget.isLeft ? 10 : null,
-          right: widget.isLeft ? null : 10,
-          top: widget.isLeft ? 10 : null,
-          bottom: widget.isLeft ? null : 10,
+          left: widget.isLeft ? 0 : null,
+          right: widget.isLeft ? null : 0,
+          top: widget.isLeft ? 0 : null,
+          bottom: widget.isLeft ? null : 0,
           child: character,
         ),
 
-        /// Butoane
+        // ── Butoane — colț opus personajului, cu spațiu între ele ──
         Positioned(
-          left: widget.isLeft ? 15 : null,
-          right: widget.isLeft ? null : 15,
-          bottom: widget.isLeft ? 20 : null,
-          top: widget.isLeft ? null : 20,
-          child: RotatedBox(
-            quarterTurns: widget.isLeft ? 1 : 3,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: widget.isLeft
-                    ? [explainButton, startButton]
-                    : [startButton, explainButton],
-              ),
-            ),
+          left: widget.isLeft ? 8 : null,
+          right: widget.isLeft ? null : 8,
+          bottom: widget.isLeft ? 8 : null,
+          top: widget.isLeft ? null : 8,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: widget.isLeft
+                ? [explainButton, const SizedBox(height: 10), startButton]
+                : [startButton, const SizedBox(height: 10), explainButton],
           ),
         ),
 
-        /// Cloud
+        // ── Cloud — aliniat spre CENTRUL panoului, departe de personaj ──
+        // Mike (isLeft): personajul e sus-stânga → cloudul spre dreapta-jos = Alignment(0.4, 0.4)
+        // Nick (isRight): personajul e jos-dreapta → cloudul spre stânga-sus = Alignment(-0.4, -0.4)
         Align(
-          alignment: Alignment.center,
+          alignment: widget.isLeft
+              ? const Alignment(0.4, 0.7)
+              : const Alignment(-0.4, -0.7),
           child: RotatedBox(
             quarterTurns: widget.isLeft ? 1 : 3,
             child: AnimatedSwitcher(
