@@ -10,6 +10,7 @@ import 'toiletC_arena_layout.dart';
 import 'toiletC_arena_layout_editor.dart';
 import 'toiletC_arena_layout_tune.dart';
 import 'toiletC_arena_scene.dart';
+import 'toiletC_arena_viewport.dart';
 import 'toiletC_item_sprite.dart';
 import 'toiletC_logic.dart';
 import 'toiletC_models.dart';
@@ -616,20 +617,32 @@ class _FestivalSplitLobby extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final layoutSize = MediaQuery.sizeOf(context);
+    final viewport = ArenaViewport.fromScreen(layoutSize);
+    final arena = viewport.arenaRect;
+
     return Stack(
       fit: StackFit.expand,
       children: [
         const Positioned.fill(
           child: ColoredBox(color: ToiletCompetitiveArenaLayout.edgeFillColor),
         ),
-        Positioned.fill(
-          child: Image.asset(
-            ToiletCompetitiveArenaLayout.arenaAsset,
-            fit: BoxFit.fitWidth,
-            alignment: Alignment.center,
-            filterQuality: FilterQuality.medium,
-            errorBuilder: (_, __, ___) => const ColoredBox(
-              color: Color(0xFFD4C4A8),
+        Positioned(
+          left: arena.left,
+          top: arena.top,
+          width: arena.width,
+          height: arena.height,
+          child: ClipRect(
+            child: Image.asset(
+              ToiletCompetitiveArenaLayout.arenaAsset,
+              fit: viewport.imageFit,
+              alignment: Alignment.center,
+              width: arena.width,
+              height: arena.height,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (_, __, ___) => const ColoredBox(
+                color: Color(0xFFD4C4A8),
+              ),
             ),
           ),
         ),
@@ -756,7 +769,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           final sz = layout.frozenSize ?? _itemStartSize;
           _spawnMissedItemFx(center: _itemCenter(layout, sz), baseSize: sz);
         }
-        _syncLayoutsForActiveItems(_playArea(size));
+        _syncLayoutsForActiveItems(
+          _playArea(ArenaViewport.fromScreen(size)),
+        );
         _pruneFinishedDepositFx();
         _pruneWorldFx();
         _pruneTicketFallFx();
@@ -852,8 +867,10 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     // Full width (same as intro) — rotated sides need half-screen width as
     // their layout height; a narrow card causes bottom overflow.
     return Scaffold(
-      body: SafeArea(
-        child: _FestivalSplitLobby(
+      backgroundColor: ToiletCompetitiveArenaLayout.edgeFillColor,
+      body: _FestivalSplitLobby(
+        child: Padding(
+          padding: MediaQuery.viewPaddingOf(context),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1090,11 +1107,15 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
   }
 
-  Rect _playArea(Size size) => ToiletCompetitiveArenaLayout.playArea(size);
+  Rect _playArea(ArenaViewport viewport) =>
+      ToiletCompetitiveArenaLayout.playArea(viewport);
 
-  Rect _playerBucketRect({required Size size, required int player}) {
+  Rect _playerBucketRect({
+    required ArenaViewport viewport,
+    required int player,
+  }) {
     return ToiletCompetitiveArenaLayout.playerBucketRect(
-      screen: size,
+      viewport: viewport,
       player: player,
       tune: _effectiveLayoutTune,
     );
@@ -1493,8 +1514,9 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final player = _pointerOwnerById.remove(pointerId);
     if (player == null) return;
 
-    final p1Bucket = _playerBucketRect(size: size, player: 1);
-    final p2Bucket = _playerBucketRect(size: size, player: 2);
+    final viewport = ArenaViewport.fromScreen(size);
+    final p1Bucket = _playerBucketRect(viewport: viewport, player: 1);
+    final p2Bucket = _playerBucketRect(viewport: viewport, player: 2);
     final p1CatchRect = _bucketCatchRect(p1Bucket, 1);
     final p2CatchRect = _bucketCatchRect(p2Bucket, 2);
 
@@ -1590,7 +1612,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     }
 
     setState(() {
-      _syncLayoutsForActiveItems(_playArea(size));
+      _syncLayoutsForActiveItems(_playArea(viewport));
     });
 
     if (_gameState.finished) {
@@ -2184,10 +2206,12 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final playArea = _playArea(size);
-    final p1Bucket = _playerBucketRect(size: size, player: 1);
-    final p2Bucket = _playerBucketRect(size: size, player: 2);
+    final size = MediaQuery.sizeOf(context);
+    final viewPadding = MediaQuery.viewPaddingOf(context);
+    final viewport = ArenaViewport.fromScreen(size);
+    final playArea = _playArea(viewport);
+    final p1Bucket = _playerBucketRect(viewport: viewport, player: 1);
+    final p2Bucket = _playerBucketRect(viewport: viewport, player: 2);
     final p1 = _gameState.players[CompetitivePlayerId.p1]!;
     final p2 = _gameState.players[CompetitivePlayerId.p2]!;
     final timeLeft = _logic.timeLeftSec(_gameState);
@@ -2206,8 +2230,10 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
     if (_phase == _GamePhase.intro) {
       return Scaffold(
-        body: SafeArea(
-          child: _FestivalSplitLobby(
+        backgroundColor: ToiletCompetitiveArenaLayout.edgeFillColor,
+        body: _FestivalSplitLobby(
+          child: Padding(
+            padding: viewPadding,
             child: Row(
             children: [
               Expanded(
@@ -2262,11 +2288,14 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
       );
     }
 
+    final hudTop = viewPadding.top + 8;
+    final hudBottom = viewPadding.bottom + 8;
+
     final gameStack = Stack(
       clipBehavior: Clip.none,
       children: [
         ToiletCompetitiveArenaScene(
-          screenSize: size,
+          viewport: viewport,
           p1Bucket: p1Bucket,
           p2Bucket: p2Bucket,
           p1Score: p1.score,
@@ -2291,7 +2320,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
             ),
           ),
         Positioned(
-          top: max(12.0, playArea.top - timerDiameter - 12),
+          top: max(viewPadding.top + 12, playArea.top - timerDiameter - 12),
           left: 0,
           right: 0,
           child: Center(
@@ -2307,27 +2336,54 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
         ..._worldFxWidgets(),
         ..._depositFxWidgets(),
         Positioned(
-          top: 8,
+          top: hudTop,
           left: 8,
           child: _ticketHud(p1.lives, p1.binType, fallLeft: true),
         ),
         Positioned(
-          top: 8,
+          top: hudTop,
           right: 8,
           child: _ticketHud(p2.lives, p2.binType, fallLeft: false),
         ),
         ..._ticketFallFxWidgets(size),
         if (kDebugMode && _layoutEditorEnabled)
           ToiletCompetitiveLayoutEditor(
-            screenSize: size,
+            viewport: viewport,
             tune: _effectiveLayoutTune,
             onTuneChanged: (t) => setState(() => _layoutTune = t),
             onClose: () => setState(() => _layoutEditorEnabled = false),
           ),
         if (kDebugMode)
           Positioned(
+            left: 8,
+            bottom: hudBottom,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xCC1E2A1F),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  child: Text(
+                    viewport.debugLabel,
+                    style: const TextStyle(
+                      color: Color(0xFFE8F0E4),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (kDebugMode)
+          Positioned(
             right: 16,
-            bottom: 16,
+            bottom: hudBottom + 8,
             child: ToiletCompetitiveLayoutEditorFab(
               enabled: _layoutEditorEnabled,
               onToggle: () => setState(
@@ -2339,25 +2395,23 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F4F1),
-      body: SafeArea(
-        child: _layoutEditorEnabled
-            ? gameStack
-            : Listener(
-                behavior: HitTestBehavior.opaque,
-                onPointerDown: (event) => _onPointerDown(event, size),
-                onPointerMove: (event) => _onPointerMove(event, size),
-                onPointerUp: (event) => _releaseDraggedItems(
-                  pointerId: event.pointer,
-                  size: size,
-                ),
-                onPointerCancel: (event) => _releaseDraggedItems(
-                  pointerId: event.pointer,
-                  size: size,
-                ),
-                child: gameStack,
+      backgroundColor: ToiletCompetitiveArenaLayout.edgeFillColor,
+      body: _layoutEditorEnabled
+          ? gameStack
+          : Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (event) => _onPointerDown(event, size),
+              onPointerMove: (event) => _onPointerMove(event, size),
+              onPointerUp: (event) => _releaseDraggedItems(
+                pointerId: event.pointer,
+                size: size,
               ),
-      ),
+              onPointerCancel: (event) => _releaseDraggedItems(
+                pointerId: event.pointer,
+                size: size,
+              ),
+              child: gameStack,
+            ),
     );
   }
 }

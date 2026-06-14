@@ -1,9 +1,9 @@
 import 'dart:ui';
 
 import 'toiletC_arena_layout_tune.dart';
+import 'toiletC_arena_viewport.dart';
 
 /// Normalized layout for the festival arena art (design size 1024×571).
-/// Uses width-fit scaling for landscape desktop/iPad.
 class ToiletCompetitiveArenaLayout {
   ToiletCompetitiveArenaLayout._();
 
@@ -20,68 +20,55 @@ class ToiletCompetitiveArenaLayout {
   static const double leftBucketAspect = 334 / 279;
   static const double rightBucketAspect = 333 / 278;
 
-  static double _scaleFor(Size screen) => screen.width / designWidth;
-
-  static double _topOffset(Size screen) {
-    final scaledH = designHeight * _scaleFor(screen);
-    return (screen.height - scaledH) / 2;
-  }
-
-  /// Fitted arena image rect (width-fit).
-  static Rect arenaImageRect(Size screen) {
-    final scale = _scaleFor(screen);
-    final w = screen.width;
-    final h = designHeight * scale;
-    final top = (screen.height - h) / 2;
-    return Rect.fromLTWH(0, top, w, h);
-  }
+  /// Fitted arena image rect in screen coordinates.
+  static Rect arenaImageRect(ArenaViewport viewport) => viewport.arenaRect;
 
   /// Screen position → normalized design coords (0–1 on 1024×571 art).
-  static Offset screenToDesignNorm(Size screen, Offset screenPos) {
-    final scale = _scaleFor(screen);
+  static Offset screenToDesignNorm(ArenaViewport viewport, Offset screenPos) {
+    final r = viewport.arenaRect;
     return Offset(
-      screenPos.dx / (designWidth * scale),
-      (screenPos.dy - _topOffset(screen)) / (designHeight * scale),
+      (screenPos.dx - r.left) / (designWidth * viewport.scale),
+      (screenPos.dy - r.top) / (designHeight * viewport.scale),
     );
   }
 
   /// Normalized design coords → screen position.
-  static Offset designNormToScreen(Size screen, double nx, double ny) {
-    final scale = _scaleFor(screen);
+  static Offset designNormToScreen(ArenaViewport viewport, double nx, double ny) {
+    final r = viewport.arenaRect;
     return Offset(
-      nx * designWidth * scale,
-      _topOffset(screen) + ny * designHeight * scale,
+      r.left + nx * designWidth * viewport.scale,
+      r.top + ny * designHeight * viewport.scale,
     );
   }
 
   static Rect normRect(
-    Size screen,
+    ArenaViewport viewport,
     double nx,
     double ny,
     double nw,
     double nh,
   ) {
-    final scale = _scaleFor(screen);
-    final top = _topOffset(screen);
+    final r = viewport.arenaRect;
+    final scale = viewport.scale;
     return Rect.fromLTWH(
-      nx * designWidth * scale,
-      top + ny * designHeight * scale,
+      r.left + nx * designWidth * scale,
+      r.top + ny * designHeight * scale,
       nw * designWidth * scale,
       nh * designHeight * scale,
     );
   }
 
   static Rect circularPitRect(
-    Size screen,
+    ArenaViewport viewport,
     double centerX,
     double centerY,
     double diameterPx,
   ) {
-    final scale = _scaleFor(screen);
+    final scale = viewport.scale;
     final nw = diameterPx / (designWidth * scale);
     final nh = diameterPx / (designHeight * scale);
     return normRect(
-      screen,
+      viewport,
       centerX - nw / 2,
       centerY - nh / 2,
       nw,
@@ -89,16 +76,20 @@ class ToiletCompetitiveArenaLayout {
     );
   }
 
-  static Rect playArea(Size screen) {
-    return normRect(screen, playLeft, playTop, playWidth, playHeight);
+  static Rect playArea(ArenaViewport viewport) {
+    return normRect(viewport, playLeft, playTop, playWidth, playHeight);
   }
 
-  static Rect binPitRect(Size screen, int player, ArenaLayoutTune tune) {
+  static Rect binPitRect(
+    ArenaViewport viewport,
+    int player,
+    ArenaLayoutTune tune,
+  ) {
     final t = tune;
     final centerX = player == 1 ? t.leftBinCenterX : t.rightBinCenterX;
     final centerY = player == 1 ? t.leftBinCenterY : t.rightBinCenterY;
-    final diameterPx = t.binPitDiameter * screen.width;
-    return circularPitRect(screen, centerX, centerY, diameterPx);
+    final diameterPx = t.binPitDiameter * viewport.arenaWidth;
+    return circularPitRect(viewport, centerX, centerY, diameterPx);
   }
 
   static double bucketAspectFor(int player) =>
@@ -120,11 +111,11 @@ class ToiletCompetitiveArenaLayout {
   }
 
   static Rect playerBucketRect({
-    required Size screen,
+    required ArenaViewport viewport,
     required int player,
     required ArenaLayoutTune tune,
   }) {
-    final pit = binPitRect(screen, player, tune);
+    final pit = binPitRect(viewport, player, tune);
     final size = bucketSizeForPit(pit, player, tune);
     return Rect.fromCenter(
       center: pit.center,

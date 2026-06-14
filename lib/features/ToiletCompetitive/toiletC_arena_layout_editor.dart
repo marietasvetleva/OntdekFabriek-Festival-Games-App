@@ -4,19 +4,20 @@ import 'package:flutter/services.dart';
 
 import 'toiletC_arena_layout.dart';
 import 'toiletC_arena_layout_tune.dart';
+import 'toiletC_arena_viewport.dart';
 
 /// Figma-style pit placement: drag handles on the arena, copy normalized values.
 /// Only intended for debug builds (`kDebugMode`).
 class ToiletCompetitiveLayoutEditor extends StatefulWidget {
   const ToiletCompetitiveLayoutEditor({
     super.key,
-    required this.screenSize,
+    required this.viewport,
     required this.tune,
     required this.onTuneChanged,
     required this.onClose,
   });
 
-  final Size screenSize;
+  final ArenaViewport viewport;
   final ArenaLayoutTune tune;
   final ValueChanged<ArenaLayoutTune> onTuneChanged;
   final VoidCallback onClose;
@@ -37,7 +38,7 @@ class _ToiletCompetitiveLayoutEditorState
 
   void _dragPit(int player, Offset screenPos) {
     final norm = ToiletCompetitiveArenaLayout.screenToDesignNorm(
-      widget.screenSize,
+      widget.viewport,
       screenPos,
     );
     final nx = norm.dx.clamp(0.02, 0.98);
@@ -65,10 +66,10 @@ class _ToiletCompetitiveLayoutEditorState
 
   @override
   Widget build(BuildContext context) {
-    final size = widget.screenSize;
+    final viewport = widget.viewport;
     final tune = _tune;
-    final p1Pit = ToiletCompetitiveArenaLayout.binPitRect(size, 1, tune);
-    final p2Pit = ToiletCompetitiveArenaLayout.binPitRect(size, 2, tune);
+    final p1Pit = ToiletCompetitiveArenaLayout.binPitRect(viewport, 1, tune);
+    final p2Pit = ToiletCompetitiveArenaLayout.binPitRect(viewport, 2, tune);
 
     Widget pitHandle({
       required int player,

@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 
 import 'toiletC_arena_layout.dart';
 import 'toiletC_arena_layout_tune.dart';
+import 'toiletC_arena_viewport.dart';
 import 'toiletC_models.dart';
 
 /// Renders the festival arena background and bucket sprites.
 class ToiletCompetitiveArenaScene extends StatelessWidget {
   const ToiletCompetitiveArenaScene({
     super.key,
-    required this.screenSize,
+    required this.viewport,
     required this.p1Bucket,
     required this.p2Bucket,
     required this.p1Score,
@@ -27,7 +28,7 @@ class ToiletCompetitiveArenaScene extends StatelessWidget {
     this.p2BucketBump = 0,
   });
 
-  final Size screenSize;
+  final ArenaViewport viewport;
   final ArenaLayoutTune layoutTune;
   final double worldTimeSec;
   final double p1BucketBump;
@@ -44,6 +45,8 @@ class ToiletCompetitiveArenaScene extends StatelessWidget {
   final Widget Function(int score, Color binColor) scoreBadge;
 
   ArenaLayoutTune get _tune => layoutTune;
+  Rect get _arena => viewport.arenaRect;
+  static const double _edgeBleed = 2;
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +60,7 @@ class ToiletCompetitiveArenaScene extends StatelessWidget {
       required double bump,
     }) {
       final pit = ToiletCompetitiveArenaLayout.binPitRect(
-        screenSize,
+        viewport,
         player,
         _tune,
       );
@@ -73,86 +76,98 @@ class ToiletCompetitiveArenaScene extends StatelessWidget {
       final squash = 1.0 - bump * 0.06;
 
       return Positioned(
-        left: topLeft.dx,
-        top: topLeft.dy + idleBob + bumpKick,
+        left: topLeft.dx - _arena.left + _edgeBleed,
+        top: topLeft.dy - _arena.top + idleBob + bumpKick,
         width: size.width,
         height: size.height,
         child: Transform.scale(
           scaleY: squash,
           alignment: Alignment.bottomCenter,
           child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Image.asset(
-              asset,
-              width: size.width,
-              height: size.height,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (_, __, ___) => Container(
+            clipBehavior: Clip.none,
+            children: [
+              Image.asset(
+                asset,
                 width: size.width,
                 height: size.height,
-                decoration: BoxDecoration(
-                  color: binTintFor(binType).withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(12),
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (_, __, ___) => Container(
+                  width: size.width,
+                  height: size.height,
+                  decoration: BoxDecoration(
+                    color: binTintFor(binType).withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
-            ),
-            Positioned(
-              left: size.width * 0.5 - 18,
-              top: -40,
-              child: RotatedBox(
-                quarterTurns: quarterTurns,
-                child: scoreBadge(score, binTintFor(binType)),
+              Positioned(
+                left: size.width * 0.5 - 18,
+                top: -40,
+                child: RotatedBox(
+                  quarterTurns: quarterTurns,
+                  child: scoreBadge(score, binTintFor(binType)),
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       );
     }
 
     return Stack(
-      clipBehavior: Clip.none,
+      clipBehavior: Clip.hardEdge,
       children: [
-        Positioned.fill(
+        const Positioned.fill(
           child: ColoredBox(color: ToiletCompetitiveArenaLayout.edgeFillColor),
         ),
-        Positioned.fill(
-          child: Image.asset(
-            ToiletCompetitiveArenaLayout.arenaAsset,
-            fit: BoxFit.fitWidth,
-            alignment: Alignment.center,
-            width: screenSize.width,
-            filterQuality: FilterQuality.medium,
-            errorBuilder: (_, __, ___) => Container(
-              color: const Color(0xFFD4C4A8),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.map_outlined,
-                size: 48,
-                color: Color(0xFF6A5A48),
-              ),
+        Positioned(
+          left: _arena.left - _edgeBleed,
+          top: _arena.top,
+          width: _arena.width + _edgeBleed * 2,
+          height: _arena.height,
+          child: ClipRect(
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  child: Image.asset(
+                    ToiletCompetitiveArenaLayout.arenaAsset,
+                    fit: viewport.imageFit,
+                    alignment: Alignment.center,
+                    filterQuality: FilterQuality.medium,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: const Color(0xFFD4C4A8),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.map_outlined,
+                        size: 48,
+                        color: Color(0xFF6A5A48),
+                      ),
+                    ),
+                  ),
+                ),
+                bucketAt(
+                  bucketRect: p1Bucket,
+                  asset: bucketAssetLeft,
+                  binType: p1BinType,
+                  score: p1Score,
+                  player: 1,
+                  quarterTurns: 1,
+                  bump: p1BucketBump,
+                ),
+                bucketAt(
+                  bucketRect: p2Bucket,
+                  asset: bucketAssetRight,
+                  binType: p2BinType,
+                  score: p2Score,
+                  player: 2,
+                  quarterTurns: 3,
+                  bump: p2BucketBump,
+                ),
+              ],
             ),
           ),
-        ),
-        bucketAt(
-          bucketRect: p1Bucket,
-          asset: bucketAssetLeft,
-          binType: p1BinType,
-          score: p1Score,
-          player: 1,
-          quarterTurns: 1,
-          bump: p1BucketBump,
-        ),
-        bucketAt(
-          bucketRect: p2Bucket,
-          asset: bucketAssetRight,
-          binType: p2BinType,
-          score: p2Score,
-          player: 2,
-          quarterTurns: 3,
-          bump: p2BucketBump,
         ),
       ],
     );
