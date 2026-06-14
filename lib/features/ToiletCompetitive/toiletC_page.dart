@@ -189,22 +189,56 @@ class _FestivalTicketPainter extends CustomPainter {
   }
 
   void _drawCrack(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final h = size.height;
-    final crack = Path()
-      ..moveTo(cx, 0)
-      ..lineTo(cx + 2, h * 0.14)
-      ..lineTo(cx - 3, h * 0.28)
-      ..lineTo(cx + 2.5, h * 0.46)
-      ..lineTo(cx - 2, h * 0.62)
-      ..lineTo(cx + 1.5, h * 0.78)
-      ..lineTo(cx, h);
+    final cy = size.height * 0.38;
+    final w = size.width;
+    final p = crackProgress.clamp(0.0, 1.0);
+    if (p <= 0) return;
+
+    final perfPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.22 * p)
+      ..style = PaintingStyle.fill;
+    for (var i = 0; i < 11; i++) {
+      final x = w * (0.06 + i * 0.088);
+      if (x / w > p * 1.08) break;
+      canvas.drawCircle(Offset(x, cy), 0.75, perfPaint);
+    }
+
+    final points = <Offset>[
+      Offset(0, cy),
+      Offset(w * 0.14, cy + 1.2),
+      Offset(w * 0.28, cy - 1.8),
+      Offset(w * 0.46, cy + 1.4),
+      Offset(w * 0.62, cy - 1.2),
+      Offset(w * 0.78, cy + 0.9),
+      Offset(w, cy),
+    ];
+
+    var totalLen = 0.0;
+    for (var i = 1; i < points.length; i++) {
+      totalLen += (points[i] - points[i - 1]).distance;
+    }
+    final targetLen = totalLen * p;
+
+    final crack = Path()..moveTo(points[0].dx, points[0].dy);
+    var walked = 0.0;
+    for (var i = 1; i < points.length; i++) {
+      final segLen = (points[i] - points[i - 1]).distance;
+      if (walked + segLen >= targetLen) {
+        final segT = ((targetLen - walked) / segLen).clamp(0.0, 1.0);
+        final end = Offset.lerp(points[i - 1], points[i], segT)!;
+        crack.lineTo(end.dx, end.dy);
+        break;
+      }
+      walked += segLen;
+      crack.lineTo(points[i].dx, points[i].dy);
+    }
+
     canvas.drawPath(
       crack,
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.85 * crackProgress)
+        ..color = Colors.black.withValues(alpha: 0.75 * p)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0
+        ..strokeWidth = 1.6
         ..strokeCap = StrokeCap.round,
     );
   }
@@ -217,16 +251,16 @@ class _FestivalTicketPainter extends CustomPainter {
 }
 
 class _HalfClipper extends CustomClipper<Rect> {
-  _HalfClipper({required this.left});
-  final bool left;
+  _HalfClipper({required this.topHalf});
+  final bool topHalf;
 
   @override
-  Rect getClip(Size size) => left
-      ? Rect.fromLTWH(0, 0, size.width / 2, size.height)
-      : Rect.fromLTWH(size.width / 2, 0, size.width / 2, size.height);
+  Rect getClip(Size size) => topHalf
+      ? Rect.fromLTWH(0, 0, size.width, size.height / 2)
+      : Rect.fromLTWH(0, size.height / 2, size.width, size.height / 2);
 
   @override
-  bool shouldReclip(covariant _HalfClipper old) => old.left != left;
+  bool shouldReclip(covariant _HalfClipper old) => old.topHalf != topHalf;
 }
 
 /// Static ticket icon in the HUD row (break animation runs in screen overlay).
@@ -292,9 +326,9 @@ class _TicketBreakAndFall extends StatelessWidget {
     final t = progress.clamp(0.0, 1.0);
     final dir = driftRight ? 1.0 : -1.0;
 
-    Widget ticketHalf({required bool left, required double crack}) {
+    Widget ticketHalf({required bool topHalf, required double crack}) {
       return ClipRect(
-        clipper: _HalfClipper(left: left),
+        clipper: _HalfClipper(topHalf: topHalf),
         child: CustomPaint(
           size: Size(w, h),
           painter: _FestivalTicketPainter(
@@ -306,96 +340,93 @@ class _TicketBreakAndFall extends StatelessWidget {
       );
     }
 
-    // Phase 1 — crack + shake (0–22%)
-    if (t <= 0.22) {
-      final pt = t / 0.22;
-      final shake = sin(pt * 8 * pi) * (1 - pt) * 5.0;
-      final crack = Curves.easeIn.transform(pt);
+    // Phase 1 — perforation tear spreads, then a tiny give (0–30%)
+    if (t <= 0.30) {
+      final pt = t / 0.30;
+      final crack = Curves.easeInCubic.transform(pt);
+      // One soft dip when the tear completes — not a buzzy shake.
+      final give = pt > 0.82
+          ? Curves.easeOut.transform(((pt - 0.82) / 0.18).clamp(0.0, 1.0)) * 2.0
+          : 0.0;
+      final voiding = 1.0 - pt * 0.12;
       return Transform.translate(
-        offset: Offset(shake, 0),
-        child: CustomPaint(
-          size: Size(w, h),
-          painter: _FestivalTicketPainter(
-            baseColor: binColor,
-            goldStripe: true,
-            crackProgress: crack,
+        offset: Offset(0, give),
+        child: Opacity(
+          opacity: voiding.clamp(0.85, 1.0),
+          child: CustomPaint(
+            size: Size(w, h),
+            painter: _FestivalTicketPainter(
+              baseColor: binColor,
+              goldStripe: true,
+              crackProgress: crack,
+            ),
           ),
         ),
       );
     }
 
-    // Phase 2 — peel apart, biased toward the fall direction (22–38%)
-    if (t <= 0.38) {
-      final pt = (t - 0.22) / 0.16;
-      final split = Curves.easeOutBack.transform(pt);
-      final gap = split * w * 0.3;
-      final leftPeel = driftRight ? -gap * 0.12 : -gap;
-      final rightPeel = driftRight ? gap : gap * 0.12;
+    // Phase 2 — halves part at the tear line (30–45%)
+    if (t <= 0.45) {
+      final pt = (t - 0.30) / 0.15;
+      final split = Curves.easeOutCubic.transform(pt);
+      final gap = split * h * 0.22;
+      final topPeel = -gap * 0.55;
+      final bottomPeel = gap * 0.55;
       return SizedBox(
-        width: w + gap * 2 + 8,
-        height: h,
+        width: w,
+        height: h + gap * 2 + 4,
         child: Stack(
           clipBehavior: Clip.none,
           alignment: Alignment.center,
           children: [
             Transform.translate(
-              offset: Offset(leftPeel, 0),
-              child: ticketHalf(left: true, crack: 1.0),
+              offset: Offset(0, topPeel),
+              child: ticketHalf(topHalf: true, crack: 1.0),
             ),
             Transform.translate(
-              offset: Offset(rightPeel, 0),
-              child: ticketHalf(left: false, crack: 1.0),
+              offset: Offset(0, bottomPeel),
+              child: ticketHalf(topHalf: false, crack: 1.0),
             ),
           ],
         ),
       );
     }
 
-    // Phase 3 — halves fall down and drift sideways (38–100%)
-    final pt = ((t - 0.38) / 0.62).clamp(0.0, 1.0);
+    // Phase 3 — halves drop and drift away (45–100%)
+    final pt = ((t - 0.45) / 0.55).clamp(0.0, 1.0);
     final fall = Curves.easeInCubic.transform(pt);
     final fade = (1.0 - Curves.easeIn.transform(pt)).clamp(0.0, 1.0);
-    final gap = w * 0.3;
+    final gap = h * 0.22;
     final drop = fall * fallDistance;
-    final drift = dir * fall * max(140.0, fallDistance * 0.28);
-    final rot = dir * fall * 0.65;
+    final drift = dir * fall * max(100.0, fallDistance * 0.22);
+    final rot = dir * fall * 0.42;
 
-    Widget fallingHalf({required bool left}) {
-      final peel = left
-          ? (driftRight ? -gap * 0.12 : -gap)
-          : (driftRight ? gap : gap * 0.12);
-      final halfRot = rot * (left ? 0.9 : 1.1);
+    Widget fallingHalf({required bool topHalf}) {
+      final peel = topHalf ? -gap * 0.55 : gap * 0.55;
+      final halfRot = rot * (topHalf ? 0.85 : 1.05);
       return Transform.translate(
-        offset: Offset(peel + drift, drop),
+        offset: Offset(drift, peel + drop),
         child: Transform.rotate(
           angle: halfRot,
-          alignment: left ? Alignment.centerRight : Alignment.centerLeft,
+          alignment: topHalf ? Alignment.bottomCenter : Alignment.topCenter,
           child: Opacity(
             opacity: fade,
-            child: ticketHalf(left: left, crack: 1.0),
+            child: ticketHalf(topHalf: topHalf, crack: 1.0),
           ),
         ),
       );
     }
 
-    final maxDrift = max(140.0, fallDistance * 0.28);
-    final driftRoom = maxDrift + gap + 24;
+    final maxDrift = max(100.0, fallDistance * 0.22);
     return SizedBox(
-      width: w + driftRoom,
-      height: h + fallDistance,
+      width: w + maxDrift,
+      height: h + fallDistance + gap + 8,
       child: Stack(
         clipBehavior: Clip.none,
+        alignment: Alignment.topLeft,
         children: [
-          Positioned(
-            left: driftRight ? 0 : driftRoom - w,
-            top: 0,
-            child: fallingHalf(left: true),
-          ),
-          Positioned(
-            left: driftRight ? 0 : driftRoom - w,
-            top: 0,
-            child: fallingHalf(left: false),
-          ),
+          fallingHalf(topHalf: true),
+          fallingHalf(topHalf: false),
         ],
       ),
     );
@@ -1186,6 +1217,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
   Offset _ticketOriginForSlot({
     required Size screenSize,
+    required double hudTop,
     required int player,
     required int slotIndex,
   }) {
@@ -1196,7 +1228,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     const ticketW = _AnimatedTicketLife.ticketWidth;
     final ticketSpan = ticketW + ticketPad * 2;
 
-    final y = hudInset + panelPadV;
+    final y = hudTop + panelPadV;
     if (player == 1) {
       return Offset(
         hudInset + panelPadH + slotIndex * ticketSpan + ticketPad,
@@ -1216,12 +1248,14 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     required Color binColor,
     required bool driftRight,
     required Size screenSize,
+    required double hudTop,
   }) {
     _ticketFallFx.add(
       _TicketFallFx(
         id: 'ticket_fall_${_ticketFallFxCounter++}',
         origin: _ticketOriginForSlot(
           screenSize: screenSize,
+          hudTop: hudTop,
           player: player,
           slotIndex: slotIndex,
         ),
@@ -1245,7 +1279,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
 
       widgets.add(
         Positioned(
-          left: fx.origin.dx - 40,
+          left: fx.origin.dx,
           top: fx.origin.dy,
           child: IgnorePointer(
             child: _TicketBreakAndFall(
@@ -1569,6 +1603,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
             binColor: _binTintFor(playerState.binType),
             driftRight: playerState.binType == BinType.organic,
             screenSize: size,
+            hudTop: MediaQuery.viewPaddingOf(context).top + 8,
           );
         }
       }
