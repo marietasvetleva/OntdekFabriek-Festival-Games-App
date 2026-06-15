@@ -92,13 +92,7 @@ flutter:
     - assets/StageGameV2-image/right_panel/
     - assets/StageGameV2-image/effects/
     - assets/StageGameV2-image/
-<<<<<<< HEAD
 
-=======
-    - assets/StageGameV2-audio/
-
-    
->>>>>>> 5dac829e2e62c717b5dc02e656622853e73bcfb3
     # festival cleaner images
     - assets/trashGame/
     - assets/trashGame/BackgroundFlow/

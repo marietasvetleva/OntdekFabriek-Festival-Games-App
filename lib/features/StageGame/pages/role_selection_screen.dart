@@ -1,5 +1,6 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart';
 import 'stage_game_page.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
@@ -10,32 +11,10 @@ class RoleSelectionScreen extends StatefulWidget {
 }
 
 class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
-  bool _leftPlayerReady = false;
-  bool _rightPlayerReady = false;
+  bool _leftReady = false;
+  bool _rightReady = false;
 
-  /*
-    AANWIJZING:
-    Beide spelers moeten eerst Ready drukken.
-    Daarna gaat de game automatisch naar StageGamePage.
-  */
-  void _checkBothReady() {
-    if (!_leftPlayerReady || !_rightPlayerReady) return;
-
-    Future.delayed(const Duration(milliseconds: 450), () {
-      if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const StageGamePage(),
-        ),
-      );
-    });
-  }
-
-  void _setLeftReady() {
-    if (_leftPlayerReady) return;
-
+  void _onPlayerReady(bool isLeft) {
     setState(() {
       if (isLeft)
         _leftReady = true;
@@ -58,194 +37,499 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F0E8),
-      body: Stack(
-        children: [
-          /*
-            AANWIJZING:
-            Achtergrond frame blijft hetzelfde als jullie design.
-          */
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Image.asset(
-                'assets/StageGameV2-image/frame.png',
-                fit: BoxFit.fill,
-              ),
+      backgroundColor: const Color(0xffececec),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xffdce8dd),
+              border: Border.all(color: Colors.grey.shade600),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _RoleSection(
+                    isLeft: true,
+                    characterImage:
+                        'assets/StageGameV2-image/firstcharacter.png',
+                    initialText:
+                        'Hello! I am Mike, nice to meet you. '
+                        'For this game, I am a Personal Assistant '
+                        'for festival stage. Do you know what it means?',
+                    explainText:
+                        'Don\'t worry — I\'ll make sure no one misses a thing. '
+                        'Your job is to organize the event timeline and keep things running smoothly.',
+                    isReady: _leftReady,
+                    onReady: () => _onPlayerReady(true),
+                  ),
+                ),
+                Container(width: 1, color: Colors.black54),
+                Expanded(
+                  child: _RoleSection(
+                    isLeft: false,
+                    characterImage:
+                        'assets/StageGameV2-image/secondcharacter.png',
+                    initialText:
+                        'Hi, I am Nick, what\'s up? '
+                        'Also for this game I am Stage Builder for this '
+                        'game stage. Do you know what it means?',
+                    explainText:
+                        'Now comes the hard part. As the stage builder, '
+                        'you must control the lights, sound and energy '
+                        'to keep the show running smoothly.',
+                    isReady: _rightReady,
+                    onReady: () => _onPlayerReady(false),
+                  ),
+                ),
+              ],
             ),
           ),
-
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(54, 42, 54, 48),
-              child: Column(
-                children: [
-                  /*
-                    AANWIJZING:
-                    Kleine header zoals de design style.
-                  */
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'IMPACT MAKERS',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontFamily: 'Courier',
-                          color: Color(0xFF8B9A85),
-                          letterSpacing: 1.4,
-                        ),
-                      ),
-                      Text(
-                        'ANNUALLY ETC',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontFamily: 'Courier',
-                          color: Color(0xFF8B9A85),
-                          letterSpacing: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDCEFE4).withOpacity(0.92),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: const Color(0xFF8FB99A),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          /*
-                            AANWIJZING:
-                            Linker speler krijgt zijn eigen view.
-                            De content is gedraaid zodat speler links het goed kan lezen.
-                          */
-                          Expanded(
-                            child: _RotatedRoleSide(
-                              quarterTurns: 1,
-                              imagePath:
-                                  'assets/StageGameV2-image/firstcharacter.png',
-                              title: 'Personal Assistant',
-                              description:
-                                  'Don’t worry — I’ll guide your decisions.\n\nChoose the equipment. Control the power. Keep the show alive.\n\nAre you ready?',
-                              buttonText:
-                                  _leftPlayerReady ? '✓ Ready' : 'Ready',
-                              isReady: _leftPlayerReady,
-                              onReady: _setLeftReady,
-                            ),
-                          ),
-
-                          Container(
-                            width: 1.5,
-                            color: const Color(0xFF7FA889),
-                          ),
-
-                          /*
-                            AANWIJZING:
-                            Rechter speler krijgt zijn eigen view.
-                            Deze is de andere kant op gedraaid.
-                          */
-                          Expanded(
-                            child: _RotatedRoleSide(
-                              quarterTurns: 3,
-                              imagePath:
-                                  'assets/StageGameV2-image/secondcharacter.png',
-                              title: 'Stage Builder',
-                              description:
-                                  'Now comes the hard part.\n\nControl the lights, sound and energy while the show is running.\n\nAre you ready?',
-                              buttonText:
-                                  _rightPlayerReady ? '✓ Ready' : 'Ready',
-                              isReady: _rightPlayerReady,
-                              onReady: _setRightReady,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  /*
-                    AANWIJZING:
-                    Deze tekst blijft normaal onderaan het scherm.
-                    Zo snappen spelers waarom de game nog niet start.
-                  */
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    child: Text(
-                      _leftPlayerReady && _rightPlayerReady
-                          ? 'Both players ready! Starting...'
-                          : 'Both players must press Ready to start',
-                      key: ValueKey(
-                        '${_leftPlayerReady}_${_rightPlayerReady}',
-                      ),
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.caveat(
-                        fontSize: 24,
-                        height: 0.9,
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFF2F2F35),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _RotatedRoleSide extends StatelessWidget {
-  final int quarterTurns;
-  final String imagePath;
-  final String title;
-  final String description;
-  final String buttonText;
+// ── Confetti particle ─────────────────────────────────────────────────────────
+class _ConfettiParticle {
+  double x, y, angle, speed, size;
+  Color color;
+
+  _ConfettiParticle(Random rng, double width, double height)
+    : x = rng.nextBool() ? -10 : width + 10,
+      y = rng.nextDouble() * height * 0.5,
+      angle = rng.nextDouble() * pi * 2,
+      speed = 2 + rng.nextDouble() * 3,
+      size = 6 + rng.nextDouble() * 8,
+      color = [
+        Colors.yellow,
+        Colors.green,
+        Colors.orange,
+        Colors.white,
+        const Color(0xff3d7a4a),
+      ][rng.nextInt(5)];
+
+  void update() {
+    x += (x < 0 ? speed : -speed);
+    y += sin(angle) * 2;
+    angle += 0.05;
+  }
+}
+
+class _ConfettiPainter extends CustomPainter {
+  final List<_ConfettiParticle> particles;
+  _ConfettiPainter(this.particles);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final p in particles) {
+      final paint = Paint()..color = p.color;
+      canvas.save();
+      canvas.translate(p.x, p.y);
+      canvas.rotate(p.angle);
+      canvas.drawRect(
+        Rect.fromCenter(
+          center: Offset.zero,
+          width: p.size,
+          height: p.size * 0.5,
+        ),
+        paint,
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ConfettiPainter old) => true;
+}
+
+// ── Speech Cloud ──────────────────────────────────────────────────────────────
+class SpeechCloud extends StatelessWidget {
+  final String text;
+  const SpeechCloud({super.key, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 500,
+          padding: const EdgeInsets.symmetric(horizontal: 44, vertical: 36),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(60),
+            border: Border.all(color: Colors.black87, width: 3),
+          ),
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 15,
+              color: Colors.black87,
+              height: 1.6,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(right: 24, top: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _bubble(10),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: _bubble(7),
+              ),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(right: 18),
+                child: _bubble(5),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _bubble(double r) => Container(
+    width: r * 2,
+    height: r * 2,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.black87, width: 2),
+    ),
+  );
+}
+
+// ── Typewriter Text ───────────────────────────────────────────────────────────
+class _TypewriterText extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+  const _TypewriterText({required this.text, required this.style});
+
+  @override
+  State<_TypewriterText> createState() => _TypewriterTextState();
+}
+
+class _TypewriterTextState extends State<_TypewriterText> {
+  String _displayed = '';
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTyping();
+  }
+
+  @override
+  void didUpdateWidget(_TypewriterText old) {
+    super.didUpdateWidget(old);
+    if (old.text != widget.text) {
+      _displayed = '';
+      _index = 0;
+      _startTyping();
+    }
+  }
+
+  void _startTyping() {
+    Future.doWhile(() async {
+      if (!mounted || _index >= widget.text.length) return false;
+      await Future.delayed(const Duration(milliseconds: 38));
+      if (!mounted) return false;
+      setState(() {
+        _displayed = widget.text.substring(0, ++_index);
+      });
+      return true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(_displayed, textAlign: TextAlign.center, style: widget.style);
+  }
+}
+
+// ── Role Section ──────────────────────────────────────────────────────────────
+class _RoleSection extends StatefulWidget {
+  final bool isLeft;
+  final String characterImage;
+  final String initialText;
+  final String explainText;
   final bool isReady;
   final VoidCallback onReady;
 
-  const _RotatedRoleSide({
-    required this.quarterTurns,
-    required this.imagePath,
-    required this.title,
-    required this.description,
-    required this.buttonText,
+  const _RoleSection({
+    required this.isLeft,
+    required this.characterImage,
+    required this.initialText,
+    required this.explainText,
     required this.isReady,
     required this.onReady,
   });
 
   @override
+  State<_RoleSection> createState() => _RoleSectionState();
+}
+
+class _RoleSectionState extends State<_RoleSection>
+    with TickerProviderStateMixin {
+  bool _showExplain = false;
+
+  // Glow
+  late AnimationController _glowController;
+  late Animation<double> _glowAnimation;
+
+  // Float
+  late AnimationController _floatController;
+  late Animation<double> _floatAnimation;
+
+  // Confetti
+  late AnimationController _confettiController;
+  final List<_ConfettiParticle> _particles = [];
+  final Random _rng = Random();
+
+  @override
+  void initState() {
+    super.initState();
+
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _glowAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
+    );
+
+    _floatController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+    _floatAnimation = Tween<double>(begin: -6, end: 6).animate(
+      CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
+    );
+
+    // Confetti ticker
+    _confettiController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    );
+    _confettiController.addListener(() {
+      setState(() {
+        for (final p in _particles) {
+          p.update();
+        }
+        _particles.removeWhere((p) => p.y > 800);
+      });
+    });
+  }
+
+  void _triggerConfetti(Size size) {
+    // Spawn 60 particule
+    for (int i = 0; i < 60; i++) {
+      _particles.add(_ConfettiParticle(_rng, size.width, size.height));
+    }
+    _confettiController.repeat();
+    // Opreste dupa 3 secunde
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) _confettiController.stop();
+    });
+  }
+
+  @override
+  void didUpdateWidget(_RoleSection old) {
+    super.didUpdateWidget(old);
+    // Cand devine Ready, declanseaza confetti + vibratia
+    if (!old.isReady && widget.isReady) {
+      // Vibratie
+      HapticFeedback.heavyImpact();
+      // Confetti — nevoie de size, il luam in build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && context.size != null) {
+          _triggerConfetti(context.size!);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    _floatController.dispose();
+    _confettiController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    /*
-      AANWIJZING:
-      LayoutBuilder + RotatedBox zorgt dat elke speler zijn eigen kant heeft.
-      De button zit onderaan binnen de gedraaide player view.
-    */
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return RotatedBox(
-          quarterTurns: quarterTurns,
-          child: SizedBox(
-            width: constraints.maxHeight,
-            height: constraints.maxWidth,
-            child: _RoleSideContent(
-              imagePath: imagePath,
-              title: title,
-              description: description,
-              buttonText: buttonText,
-              isReady: isReady,
-              onReady: onReady,
+    final String currentText = _showExplain
+        ? widget.explainText
+        : widget.initialText;
+
+    // ── Buton START ──
+    final Widget startButton = GestureDetector(
+      onTap: widget.isReady ? null : widget.onReady,
+      child: AnimatedScale(
+        scale: widget.isReady ? 1.08 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutBack,
+        child: Container(
+          width: 58,
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: widget.isReady
+                ? const Color(0xff2e5e38)
+                : const Color(0xff3d7a4a),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: RotatedBox(
+            quarterTurns: widget.isLeft ? 1 : 3,
+            child: Text(
+              widget.isReady ? 'Ready!' : 'Start',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
             ),
+          ),
+        ),
+      ),
+    );
+
+    // ── Buton EXPLAIN MORE ──
+    final Widget explainButton = GestureDetector(
+      onTap: widget.isReady
+          ? null
+          : () => setState(() => _showExplain = !_showExplain),
+      child: Container(
+        width: 58,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: _showExplain
+              ? const Color(0xff4a7a54)
+              : const Color(0xff5a8f64),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: RotatedBox(
+          quarterTurns: widget.isLeft ? 1 : 3,
+          child: Text(
+            _showExplain ? '✕ Close' : '? Explain More',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // ── Personaj cu float ──
+    Widget character = RotatedBox(
+      quarterTurns: widget.isLeft ? 1 : 3,
+      child: AnimatedBuilder(
+        animation: _floatAnimation,
+        builder: (context, child) => Transform.translate(
+          offset: Offset(0, _floatAnimation.value),
+          child: child,
+        ),
+        child: SizedBox(
+          width: 480,
+          child: Image.asset(widget.characterImage, fit: BoxFit.contain),
+        ),
+      ),
+    );
+
+    if (widget.isReady) {
+      character = AnimatedBuilder(
+        animation: _glowAnimation,
+        builder: (context, child) => Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(120),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.yellowAccent.withOpacity(
+                  0.7 * _glowAnimation.value,
+                ),
+                blurRadius: 60 * _glowAnimation.value,
+                spreadRadius: 0,
+              ),
+            ],
+          ),
+          child: child,
+        ),
+        child: character,
+      );
+    }
+
+    return Stack(
+      children: [
+        // 1. Personaj
+        Positioned(
+          left: widget.isLeft ? 0 : null,
+          right: widget.isLeft ? null : 0,
+          top: widget.isLeft ? 0 : null,
+          bottom: widget.isLeft ? null : 0,
+          child: character,
+        ),
+
+        // 2. Cloud cu typewriter
+        Align(
+          alignment: widget.isLeft
+              ? const Alignment(0.3, 0.2)
+              : const Alignment(-0.3, -0.2),
+          child: RotatedBox(
+            quarterTurns: widget.isLeft ? 1 : 3,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.08),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              ),
+              // ← Typewriter în loc de Text simplu
+              child: _CloudWithTypewriter(
+                key: ValueKey(currentText),
+                text: currentText,
+              ),
+            ),
+          ),
+        ),
+
+        // 3. Confetti — deasupra tuturor
+        if (_particles.isNotEmpty)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(painter: _ConfettiPainter(_particles)),
+            ),
+          ),
+
+        // 4. Butoane — ultimele = deasupra
+        Positioned(
+          left: widget.isLeft ? 8 : null,
+          right: widget.isLeft ? null : 8,
+          bottom: widget.isLeft ? 8 : null,
+          top: widget.isLeft ? null : 8,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: widget.isLeft
+                ? [explainButton, const SizedBox(height: 10), startButton]
+                : [startButton, const SizedBox(height: 10), explainButton],
           ),
         ),
       ],
@@ -253,166 +537,164 @@ class _RotatedRoleSide extends StatelessWidget {
   }
 }
 
-class _RoleSideContent extends StatelessWidget {
-  final String imagePath;
-  final String title;
-  final String description;
-  final String buttonText;
-  final bool isReady;
-  final VoidCallback onReady;
-
-  const _RoleSideContent({
-    required this.imagePath,
-    required this.title,
-    required this.description,
-    required this.buttonText,
-    required this.isReady,
-    required this.onReady,
-  });
+// ── Cloud cu typewriter înăuntru ──────────────────────────────────────────────
+class _CloudWithTypewriter extends StatelessWidget {
+  final String text;
+  const _CloudWithTypewriter({super.key, required this.text});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 20, 28, 20),
-      child: Column(
-        children: [
-          /*
-            AANWIJZING:
-            Character staat bovenaan voor elke speler.
-          */
-          Expanded(
-            flex: 5,
-            child: Center(
-              child: AnimatedScale(
-                scale: isReady ? 1.05 : 1.0,
-                duration: const Duration(milliseconds: 240),
-                curve: Curves.easeOutBack,
-                child: Image.asset(
-                  imagePath,
-                  fit: BoxFit.contain,
-                ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 500,
+          padding: const EdgeInsets.symmetric(horizontal: 44, vertical: 36),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(60),
+            border: Border.all(color: Colors.black87, width: 3),
+          ),
+          child: _TypewriterHighlight(text: text),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(right: 24, top: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _dot(10),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: _dot(7),
+              ),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(right: 18),
+                child: _dot(5),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _dot(double r) => Container(
+    width: r * 2,
+    height: r * 2,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.black87, width: 2),
+    ),
+  );
+}
+
+// ── Typewriter + Highlight combinat ──────────────────────────────────────────
+class _TypewriterHighlight extends StatefulWidget {
+  final String text;
+  const _TypewriterHighlight({required this.text});
+
+  @override
+  State<_TypewriterHighlight> createState() => _TypewriterHighlightState();
+}
+
+class _TypewriterHighlightState extends State<_TypewriterHighlight> {
+  int _visibleChars = 0;
+  static const _highlights = ['Personal Assistant', 'Stage Builder'];
+
+  @override
+  void initState() {
+    super.initState();
+    _startTyping();
+  }
+
+  @override
+  void didUpdateWidget(_TypewriterHighlight old) {
+    super.didUpdateWidget(old);
+    if (old.text != widget.text) {
+      setState(() => _visibleChars = 0);
+      _startTyping();
+    }
+  }
+
+  void _startTyping() {
+    Future.doWhile(() async {
+      if (!mounted || _visibleChars >= widget.text.length) return false;
+      await Future.delayed(const Duration(milliseconds: 38));
+      if (!mounted) return false;
+      setState(() => _visibleChars++);
+      return true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Textul vizibil pana la _visibleChars
+    final visible = widget.text.substring(0, _visibleChars);
+    final spans = <InlineSpan>[];
+    String remaining = visible;
+
+    while (remaining.isNotEmpty) {
+      int earliestIndex = remaining.length;
+      String? foundKeyword;
+
+      for (final kw in _highlights) {
+        final idx = remaining.indexOf(kw);
+        if (idx != -1 && idx < earliestIndex) {
+          earliestIndex = idx;
+          foundKeyword = kw;
+        }
+      }
+
+      if (foundKeyword == null) {
+        spans.add(TextSpan(text: remaining));
+        break;
+      }
+
+      if (earliestIndex > 0) {
+        spans.add(TextSpan(text: remaining.substring(0, earliestIndex)));
+      }
+
+      final kw = foundKeyword;
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xff3d7a4a),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              kw,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                height: 1.4,
               ),
             ),
           ),
+        ),
+      );
 
-          const SizedBox(height: 14),
+      remaining = remaining.substring(earliestIndex + kw.length);
+    }
 
-          /*
-            AANWIJZING:
-            Tekstbox onder de character.
-            Wanneer speler ready is verandert de box naar ready feedback.
-          */
-          Expanded(
-            flex: 4,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 240),
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-              decoration: BoxDecoration(
-                color: isReady
-                    ? const Color(0xFFE8F5D0).withOpacity(0.95)
-                    : const Color(0xFFDCEFE4).withOpacity(0.92),
-                borderRadius: BorderRadius.circular(9),
-                border: Border.all(
-                  color: isReady
-                      ? const Color(0xFF5F985F)
-                      : const Color(0xFF8FB99A),
-                  width: isReady ? 2 : 1.2,
-                ),
-                boxShadow: [
-                  if (isReady)
-                    BoxShadow(
-                      color: const Color(0xFF5F985F).withOpacity(0.16),
-                      blurRadius: 12,
-                      spreadRadius: 1,
-                    ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    isReady ? '$title ✓' : title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.caveat(
-                      fontSize: 31,
-                      height: 0.9,
-                      fontWeight: FontWeight.w900,
-                      color: const Color(0xFF111111),
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        isReady
-                            ? 'Ready!\nWaiting for the other player...'
-                            : description,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.caveat(
-                          fontSize: 25,
-                          height: 1.25,
-                          fontWeight: FontWeight.w800,
-                          color: const Color(0xFF111111),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          /*
-            AANWIJZING:
-            Button staat onderaan per speler.
-            Dus niet in het midden van het scherm, maar onder de eigen role card.
-          */
-          GestureDetector(
-            onTap: isReady ? null : onReady,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              width: 142,
-              height: 48,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: isReady
-                    ? const Color(0xFF3F6F4A)
-                    : const Color(0xFF529E68),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: isReady
-                      ? const Color(0xFF2E5638)
-                      : const Color(0xFF418455),
-                  width: 1.4,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF529E68).withOpacity(
-                      isReady ? 0.18 : 0.12,
-                    ),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Text(
-                buttonText,
-                style: GoogleFonts.caveat(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 25,
-                  height: 0.9,
-                ),
-              ),
-            ),
-          ),
-        ],
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        style: const TextStyle(
+          fontSize: 19,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
+          height: 1.6,
+        ),
+        children: spans,
       ),
     );
   }

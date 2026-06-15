@@ -30,10 +30,22 @@ class _FinalScreenState extends State<FinalScreen> {
   bool _soundPlayed = false;
   bool _leftPlayAgainReady = false;
   bool _rightPlayAgainReady = false;
+  double _flashOpacity = 0;
 
   @override
   void initState() {
     super.initState();
+
+    _flashOpacity = 1;
+
+    Future.delayed(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+
+      setState(() {
+        _flashOpacity = 0;
+      });
+    });
+
     _playResultSound();
   }
 
@@ -51,15 +63,22 @@ class _FinalScreenState extends State<FinalScreen> {
     final reaction = widget.crowdReaction.toLowerCase();
     final comment = widget.endComment.toLowerCase();
 
-    final isBadResult = reaction.contains('boo') ||
+    final isBadResult =
+        reaction.contains('boo') ||
         comment.contains('failed') ||
         comment.contains('overload') ||
         widget.audienceScore < 50;
 
+    _flashOpacity = isBadResult ? 1 : 0;
+
     if (isBadResult) {
-      _audioService.playCrowdBoo();
-    } else {
-      _audioService.playCrowdCheer();
+      Future.delayed(const Duration(milliseconds: 250), () {
+        if (!mounted) return;
+
+        setState(() {
+          _flashOpacity = 0;
+        });
+      });
     }
   }
 
@@ -91,9 +110,7 @@ class _FinalScreenState extends State<FinalScreen> {
 
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(
-          builder: (_) => const SplashScreen(),
-        ),
+        MaterialPageRoute(builder: (_) => const SplashScreen()),
         (route) => false,
       );
     });
@@ -127,6 +144,14 @@ class _FinalScreenState extends State<FinalScreen> {
                   'assets/StageGameV2-image/frame.png',
                   fit: BoxFit.fill,
                 ),
+              ),
+            ),
+
+            AnimatedOpacity(
+              opacity: _flashOpacity,
+              duration: const Duration(milliseconds: 300),
+              child: IgnorePointer(
+                child: Container(color: Colors.red.withOpacity(0.12)),
               ),
             ),
 
@@ -216,10 +241,7 @@ class _FinalResultPanel extends StatelessWidget {
         Expanded(
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              vertical: 16,
-              horizontal: 16,
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             decoration: BoxDecoration(
               color: const Color.fromRGBO(234, 234, 224, 0.9),
               borderRadius: BorderRadius.circular(20),
@@ -254,15 +276,9 @@ class _FinalResultPanel extends StatelessWidget {
                   value: sustainabilityScore,
                 ),
                 const SizedBox(height: 8),
-                _ScoreRow(
-                  label: 'Stability Score',
-                  value: stabilityScore,
-                ),
+                _ScoreRow(label: 'Stability Score', value: stabilityScore),
                 const SizedBox(height: 8),
-                _ScoreRow(
-                  label: 'Audience Satisfaction',
-                  value: audienceScore,
-                ),
+                _ScoreRow(label: 'Audience Satisfaction', value: audienceScore),
               ],
             ),
           ),
@@ -310,19 +326,13 @@ class _ScoreRow extends StatelessWidget {
   final String label;
   final int value;
 
-  const _ScoreRow({
-    required this.label,
-    required this.value,
-  });
+  const _ScoreRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        vertical: 10,
-        horizontal: 16,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       decoration: BoxDecoration(
         color: const Color(0xFF9DC4A8),
         borderRadius: BorderRadius.circular(30),
@@ -342,13 +352,19 @@ class _ScoreRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          Text(
-            value.toString(),
-            style: GoogleFonts.caveat(
-              fontSize: 25,
-              fontWeight: FontWeight.w900,
-              color: Colors.black,
-            ),
+          TweenAnimationBuilder<int>(
+            tween: IntTween(begin: 0, end: value),
+            duration: const Duration(milliseconds: 1500),
+            builder: (context, score, child) {
+              return Text(
+                '$score',
+                style: GoogleFonts.caveat(
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                ),
+              );
+            },
           ),
         ],
       ),
