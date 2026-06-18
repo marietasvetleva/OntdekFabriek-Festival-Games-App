@@ -79,6 +79,16 @@ flutter:
 
     # Toilet game images
     - assets/ToiletImage/
+    # Toilet Competitive (2-player) images
+    - assets/ToiletCompetitive/
+    - assets/ToiletCompetitive/items/
+    # Item aging sprites live in per-type subfolders (directory entries are not recursive).
+    - assets/ToiletCompetitive/items/banana/
+    - assets/ToiletCompetitive/items/apple/
+    - assets/ToiletCompetitive/items/leaf/
+    - assets/ToiletCompetitive/items/metal_can/
+    - assets/ToiletCompetitive/items/juice_box/
+    - assets/ToiletCompetitive/items/water_bottle/
     - assets/sounds/
 
     # Stage images

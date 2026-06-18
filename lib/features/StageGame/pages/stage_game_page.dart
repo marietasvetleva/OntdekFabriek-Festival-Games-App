@@ -414,8 +414,10 @@ class _StageGamePageState extends State<StageGamePage>
     switch (option) {
       case PowerSourceOption.solar:
         return 'Solar';
+
       case PowerSourceOption.hybrid:
         return 'Hybrid';
+
       case PowerSourceOption.generator:
         return 'Generator';
     }
@@ -683,7 +685,8 @@ class _StageGamePageState extends State<StageGamePage>
       ),
     );
   }
-    Widget _buildFestivalAssistantPanel() {
+
+  Widget _buildFestivalAssistantPanel() {
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -1523,15 +1526,18 @@ class _StageGamePageState extends State<StageGamePage>
     if (asset == null) return const SizedBox.shrink();
 
     return Positioned(
-      left: 72,
-      bottom: 95,
-      child: _stageAssetImage(
-        asset: asset,
-        size: 72,
-        pulse: pulse,
-        label: _state.selectedPowerSource == null
-            ? null
-            : _powerSourceLabel(_state.selectedPowerSource!),
+      left: 230,
+      top: 390,
+      child: Transform.rotate(
+        angle: -1.57,
+        child: _stageAssetImage(
+          asset: asset,
+          size: 135,
+          pulse: pulse,
+          label: _state.selectedPowerSource == null
+              ? null
+              : _powerSourceLabel(_state.selectedPowerSource!),
+        ),
       ),
     );
   }
@@ -1545,35 +1551,27 @@ class _StageGamePageState extends State<StageGamePage>
 
     final shake = isDistorted ? math.sin(pulse * math.pi * 16) * 5 : 0.0;
     final rotate = isDistorted ? math.sin(pulse * math.pi * 14) * 0.05 : 0.0;
-    final size = _state.selectedSound == SoundOption.pro ? 76.0 : 70.0;
+
+    // CHANGED:
+    // Speakers are about 25% smaller and placed more inline on the stage.
+    final size = _state.selectedSound == SoundOption.pro ? 108.0 : 101.0;
 
     return Stack(
       children: [
         Positioned(
-          left: 135 + shake,
-          top: 215 + math.sin(pulse * math.pi * 2) * 2,
+          left: 315 + shake,
+          top: 175 + math.sin(pulse * math.pi * 2) * 2,
           child: Transform.rotate(
-            angle: rotate,
-            child: _stageAssetImage(
-              asset: asset,
-              size: size,
-              pulse: pulse,
-            ),
+            angle: rotate - 1.57,
+            child: _stageAssetImage(asset: asset, size: size, pulse: pulse),
           ),
         ),
         Positioned(
-          right: 135 - shake,
-          top: 215 + math.sin((pulse + 0.3) * math.pi * 2) * 2,
-          child: Transform.scale(
-            scaleX: -1,
-            child: Transform.rotate(
-              angle: -rotate,
-              child: _stageAssetImage(
-                asset: asset,
-                size: size,
-                pulse: pulse,
-              ),
-            ),
+          left: 270 - shake,
+          top: 315 + math.sin((pulse + 0.3) * math.pi * 2) * 2,
+          child: Transform.rotate(
+            angle: rotate - 1.57,
+            child: _stageAssetImage(asset: asset, size: size, pulse: pulse),
           ),
         ),
       ],
@@ -1589,27 +1587,40 @@ class _StageGamePageState extends State<StageGamePage>
     final glow = (0.28 + math.sin(pulse * math.pi * 2).abs() * 0.12) *
         levelPower;
 
+    // CHANGED:
+    // Light assets are smaller. LED is placed more up.
+    // Halogen is moved more to the left.
+    final isLed = _state.selectedLight == LightOption.led;
+    final isHalogen = _state.selectedLight == LightOption.halogen;
+
+    final double xOffset = isHalogen ? -35 : 0;
+    final double yOffset = isLed ? -45 : 0;
+
     return Stack(
       children: [
         Positioned(
-          left: 180,
-          top: 58,
-          child: _lightRigAsset(asset, color, glow),
+          left: 250 + xOffset,
+          top: 45 + yOffset,
+          child: Transform.rotate(
+            angle: -1.57,
+            child: _lightRigAsset(asset, color, glow, size: 70),
+          ),
         ),
         Positioned(
-          right: 180,
-          top: 58,
-          child: _lightRigAsset(asset, color, glow),
+          left: 292 + xOffset,
+          top: 130 + yOffset,
+          child: Transform.rotate(
+            angle: -1.57,
+            child: _lightRigAsset(asset, color, glow * 0.8, size: 60),
+          ),
         ),
         Positioned(
-          left: 250,
-          top: 112,
-          child: _lightRigAsset(asset, color, glow * 0.8, size: 48),
-        ),
-        Positioned(
-          right: 250,
-          top: 112,
-          child: _lightRigAsset(asset, color, glow * 0.8, size: 48),
+          left: 225 + xOffset,
+          top: 222 + yOffset,
+          child: Transform.rotate(
+            angle: -1.57,
+            child: _lightRigAsset(asset, color, glow * 0.8, size: 60),
+          ),
         ),
       ],
     );
@@ -1619,7 +1630,7 @@ class _StageGamePageState extends State<StageGamePage>
     String asset,
     Color color,
     double glow, {
-    double size = 58,
+    double size = 82,
   }) {
     return Stack(
       alignment: Alignment.center,
@@ -1648,68 +1659,44 @@ class _StageGamePageState extends State<StageGamePage>
       ],
     );
   }
-    Widget _buildSelectedEffectOnStage(double pulse) {
+
+  Widget _buildSelectedEffectOnStage(double pulse) {
     if (_state.selectedEffect == null) {
       return const SizedBox.shrink();
     }
 
     if (_state.selectedEffect == EffectOption.laser) {
+      // CHANGED:
+      // Lasers are more split and placed above the stage, but still on the stage visual.
       return Stack(
         children: [
           _laserImage(
-            left: 90,
-            top: 128,
-            angle: -0.55,
-            width: 255,
+            left: 190,
+            top: 58,
+            angle: 0.82 - 1.57,
+            width: 230,
             pulse: pulse,
           ),
           _laserImage(
-            right: 90,
-            top: 128,
-            angle: 0.55,
-            width: 255,
+            left: 270,
+            top: 48,
+            angle: 0.48 - 1.57,
+            width: 220,
             pulse: pulse,
           ),
           _laserImage(
-            left: 170,
-            top: 176,
-            angle: -0.25,
+            left: 350,
+            top: 62,
+            angle: 0.18 - 1.57,
+            width: 210,
+            pulse: pulse,
+          ),
+          _laserImage(
+            left: 430,
+            top: 92,
+            angle: -0.10 - 1.57,
             width: 190,
             pulse: pulse,
-          ),
-          _laserImage(
-            right: 170,
-            top: 176,
-            angle: 0.25,
-            width: 190,
-            pulse: pulse,
-          ),
-          Positioned(
-            top: 220,
-            left: 250,
-            right: 250,
-            child: Container(
-              height: 4,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(99),
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.transparent,
-                    const Color(0xFF58E28B).withOpacity(0.65),
-                    const Color(0xFFB8FFD2).withOpacity(0.75),
-                    const Color(0xFF58E28B).withOpacity(0.65),
-                    Colors.transparent,
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF58E28B).withOpacity(0.40),
-                    blurRadius: 18,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-            ),
           ),
         ],
       );
@@ -1723,33 +1710,33 @@ class _StageGamePageState extends State<StageGamePage>
         children: [
           _droneImage(
             asset,
-            left: 118,
-            top: 82,
-            size: 52,
+            left: 370,
+            top: 85,
+            size: 125,
             pulse: pulse,
             phase: 0,
           ),
           _droneImage(
             asset,
-            right: 128,
-            top: 104,
-            size: 50,
+            left: 240,
+            top: 360,
+            size: 120,
             pulse: pulse,
             phase: 0.25,
           ),
           _droneImage(
             asset,
-            left: 260,
-            top: 150,
-            size: 44,
+            left: 430,
+            top: 190,
+            size: 110,
             pulse: pulse,
             phase: 0.55,
           ),
           _droneImage(
             asset,
-            right: 275,
-            top: 152,
-            size: 44,
+            left: 235,
+            top: 235,
+            size: 110,
             pulse: pulse,
             phase: 0.75,
           ),
@@ -1761,45 +1748,47 @@ class _StageGamePageState extends State<StageGamePage>
       final asset = _effectAsset();
       if (asset == null) return const SizedBox.shrink();
 
+      // CHANGED:
+      // Fireworks now form a curved arc over the top part of the stage.
       return Stack(
         children: [
           _fireworkImage(
             asset,
-            left: 100,
-            top: 65,
-            size: 82,
+            left: 185,
+            top: 115,
+            size: 135,
             pulse: pulse,
             phase: 0,
           ),
           _fireworkImage(
             asset,
-            right: 110,
-            top: 58,
-            size: 88,
+            left: 255,
+            top: 72,
+            size: 155,
             pulse: pulse,
             phase: 0.2,
           ),
           _fireworkImage(
             asset,
-            left: 280,
-            top: 118,
-            size: 64,
+            left: 340,
+            top: 58,
+            size: 165,
             pulse: pulse,
             phase: 0.4,
           ),
           _fireworkImage(
             asset,
-            right: 290,
-            top: 130,
-            size: 64,
+            left: 430,
+            top: 78,
+            size: 150,
             pulse: pulse,
             phase: 0.6,
           ),
           _fireworkImage(
             asset,
-            left: 430,
-            top: 185,
-            size: 54,
+            left: 505,
+            top: 122,
+            size: 130,
             pulse: pulse,
             phase: 0.8,
           ),
@@ -1817,27 +1806,29 @@ class _StageGamePageState extends State<StageGamePage>
       return const SizedBox.shrink();
     }
 
+    // CHANGED:
+    // Bubbles are rotated like the right panel and moved into the crowd/audience area.
     return Stack(
       children: [
         if (messages.isNotEmpty)
           _crowdBubble(
             text: messages[0],
-            left: 78,
-            top: 365 + math.sin(pulse * math.pi * 2) * 4,
+            left: 500,
+            top: 118 + math.sin(pulse * math.pi * 2) * 4,
             color: const Color(0xFFFDFCF7),
           ),
         if (messages.length > 1)
           _crowdBubble(
             text: messages[1],
-            right: 72,
-            top: 350 + math.sin((pulse + 0.35) * math.pi * 2) * 4,
+            left: 560,
+            top: 230 + math.sin((pulse + 0.35) * math.pi * 2) * 4,
             color: const Color(0xFFFFF2C2),
           ),
         if (messages.length > 2)
           _crowdBubble(
             text: messages[2],
-            left: 300,
-            top: 70 + math.sin((pulse + 0.7) * math.pi * 2) * 4,
+            left: 505,
+            top: 345 + math.sin((pulse + 0.7) * math.pi * 2) * 4,
             color: const Color(0xFFE6F1E8),
           ),
       ],
@@ -1933,34 +1924,37 @@ class _StageGamePageState extends State<StageGamePage>
       right: right,
       top: top,
       child: IgnorePointer(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 128),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.92),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: const Color(0xFFD8D0C2),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+        child: Transform.rotate(
+          angle: -1.57,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 128),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.92),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: const Color(0xFFD8D0C2),
+                width: 1,
               ),
-            ],
-          ),
-          child: Text(
-            text,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.caveat(
-              fontSize: 15,
-              height: 0.9,
-              fontWeight: FontWeight.w900,
-              color: const Color(0xFF2F2F35),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.caveat(
+                fontSize: 15,
+                height: 0.9,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF2F2F35),
+              ),
             ),
           ),
         ),
@@ -2037,7 +2031,7 @@ class _StageGamePageState extends State<StageGamePage>
       right: right,
       top: top + y,
       child: Transform.rotate(
-        angle: angle,
+        angle: angle - 1.57,
         child: Image.asset(
           asset,
           width: size,
@@ -2070,11 +2064,14 @@ class _StageGamePageState extends State<StageGamePage>
         opacity: opacity,
         child: Transform.scale(
           scale: scale,
-          child: Image.asset(
-            asset,
-            width: size,
-            height: size,
-            fit: BoxFit.contain,
+          child: Transform.rotate(
+            angle: -1.57,
+            child: Image.asset(
+              asset,
+              width: size,
+              height: size,
+              fit: BoxFit.contain,
+            ),
           ),
         ),
       ),
