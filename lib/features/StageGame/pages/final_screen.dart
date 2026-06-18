@@ -47,6 +47,21 @@ class _FinalScreenState extends State<FinalScreen> {
     await Future.delayed(const Duration(milliseconds: 250));
 
     if (!mounted) return;
+
+    final reaction = widget.crowdReaction.toLowerCase();
+    final comment = widget.endComment.toLowerCase();
+
+    final isBadResult =
+        reaction.contains('boo') ||
+        comment.contains('failed') ||
+        comment.contains('overload') ||
+        widget.audienceScore < 50;
+
+    if (isBadResult) {
+      _audioService.playCrowdBoo();
+    } else {
+      _audioService.playCrowdCheer();
+    }
   }
 
   void _setLeftPlayAgainReady() {
@@ -113,7 +128,6 @@ class _FinalScreenState extends State<FinalScreen> {
                 ),
               ),
             ),
-
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(18),
@@ -139,9 +153,7 @@ class _FinalScreenState extends State<FinalScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(width: 16),
-
                     Expanded(
                       child: Center(
                         child: RotatedBox(
@@ -242,9 +254,7 @@ class _FinalResultPanel extends StatelessWidget {
             ),
           ),
         ),
-
         const SizedBox(height: 12),
-
         GestureDetector(
           onTap: isPlayAgainReady ? null : onPlayAgainReady,
           child: AnimatedContainer(
