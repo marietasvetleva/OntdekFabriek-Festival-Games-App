@@ -1,6 +1,7 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import 'stage_game_page.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
@@ -11,357 +12,185 @@ class RoleSelectionScreen extends StatefulWidget {
 }
 
 class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
-  bool _leftReady = false;
-  bool _rightReady = false;
+  bool _leftPlayerReady = false;
+  bool _rightPlayerReady = false;
 
-  void _onPlayerReady(bool isLeft) {
-    setState(() {
-      if (isLeft)
-        _leftReady = true;
-      else
-        _rightReady = true;
+  void _checkBothReady() {
+    if (!_leftPlayerReady || !_rightPlayerReady) return;
+    Future.delayed(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const StageGamePage()),
+      );
     });
+  }
 
-    if (_leftReady && _rightReady) {
-      Future.delayed(const Duration(milliseconds: 400), () {
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const StageGamePage()),
-          );
-        }
-      });
-    }
+  void _setLeftReady() {
+    if (_leftPlayerReady) return;
+    setState(() => _leftPlayerReady = true);
+    HapticFeedback.heavyImpact();
+    _checkBothReady();
+  }
+
+  void _setRightReady() {
+    if (_rightPlayerReady) return;
+    setState(() => _rightPlayerReady = true);
+    HapticFeedback.heavyImpact();
+    _checkBothReady();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xffececec),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xffdce8dd),
-              border: Border.all(color: Colors.grey.shade600),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _RoleSection(
-                    isLeft: true,
-                    characterImage:
-                        'assets/StageGameV2-image/firstcharacter.png',
-                    initialText:
-                        'Hello! I am Mike, nice to meet you. '
-                        'For this game, I am a Personal Assistant '
-                        'for festival stage. Do you know what it means?',
-                    explainText:
-                        'Don\'t worry — I\'ll make sure no one misses a thing. '
-                        'Your job is to organize the event timeline and keep things running smoothly.',
-                    isReady: _leftReady,
-                    onReady: () => _onPlayerReady(true),
-                  ),
-                ),
-                Container(width: 1, color: Colors.black54),
-                Expanded(
-                  child: _RoleSection(
-                    isLeft: false,
-                    characterImage:
-                        'assets/StageGameV2-image/secondcharacter.png',
-                    initialText:
-                        'Hi, I am Nick, what\'s up? '
-                        'Also for this game I am Stage Builder for this '
-                        'game stage. Do you know what it means?',
-                    explainText:
-                        'Now comes the hard part. As the stage builder, '
-                        'you must control the lights, sound and energy '
-                        'to keep the show running smoothly.',
-                    isReady: _rightReady,
-                    onReady: () => _onPlayerReady(false),
-                  ),
-                ),
-              ],
+      backgroundColor: const Color(0xFFF5F0E8),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Image.asset(
+                'assets/StageGameV2-image/frame.png',
+                fit: BoxFit.fill,
+              ),
             ),
           ),
-        ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(54, 42, 54, 48),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _RotatedRoleSide(
+                      quarterTurns: 1,
+                      imagePath: 'assets/StageGameV2-image/firstcharacter.png',
+                      initialText:
+                          'Hello! I am Mike, nice to meet you.\n\nFor this game, I am your Personal Assistant for the festival stage.',
+                      explainText:
+                          'Don\u2019t worry \u2014 I\u2019ll help with the planning side.\n\nYour job is to choose the equipment, watch the choices and help keep the show organized.',
+                      buttonText: _leftPlayerReady ? '\u2713 Ready' : 'Ready',
+                      isReady: _leftPlayerReady,
+                      onReady: _setLeftReady,
+                    ),
+                  ),
+                  Container(width: 1.5, color: const Color(0xFF7FA889)),
+                  Expanded(
+                    child: _RotatedRoleSide(
+                      quarterTurns: 3,
+                      imagePath: 'assets/StageGameV2-image/secondcharacter.png',
+                      initialText:
+                          'Hi, I am Nick, what\u2019s up?\n\nFor this game, I am the Stage Builder for the festival stage.',
+                      explainText:
+                          'Now comes the hard part.\n\nYou must control the lights, sound and energy while the show is running smoothly.',
+                      buttonText: _rightPlayerReady ? '\u2713 Ready' : 'Ready',
+                      isReady: _rightPlayerReady,
+                      onReady: _setRightReady,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ── Confetti particle ─────────────────────────────────────────────────────────
-class _ConfettiParticle {
-  double x, y, angle, speed, size;
-  Color color;
-
-  _ConfettiParticle(Random rng, double width, double height)
-    : x = rng.nextBool() ? -10 : width + 10,
-      y = rng.nextDouble() * height * 0.5,
-      angle = rng.nextDouble() * pi * 2,
-      speed = 2 + rng.nextDouble() * 3,
-      size = 6 + rng.nextDouble() * 8,
-      color = [
-        Colors.yellow,
-        Colors.green,
-        Colors.orange,
-        Colors.white,
-        const Color(0xff3d7a4a),
-      ][rng.nextInt(5)];
-
-  void update() {
-    x += (x < 0 ? speed : -speed);
-    y += sin(angle) * 2;
-    angle += 0.05;
-  }
-}
-
-class _ConfettiPainter extends CustomPainter {
-  final List<_ConfettiParticle> particles;
-  _ConfettiPainter(this.particles);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (final p in particles) {
-      final paint = Paint()..color = p.color;
-      canvas.save();
-      canvas.translate(p.x, p.y);
-      canvas.rotate(p.angle);
-      canvas.drawRect(
-        Rect.fromCenter(
-          center: Offset.zero,
-          width: p.size,
-          height: p.size * 0.5,
-        ),
-        paint,
-      );
-      canvas.restore();
-    }
-  }
-
-  @override
-  bool shouldRepaint(_ConfettiPainter old) => true;
-}
-
-// ── Speech Cloud ──────────────────────────────────────────────────────────────
-class SpeechCloud extends StatelessWidget {
-  final String text;
-  const SpeechCloud({super.key, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 500,
-          padding: const EdgeInsets.symmetric(horizontal: 44, vertical: 36),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(60),
-            border: Border.all(color: Colors.black87, width: 3),
-          ),
-          child: Text(
-            text,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 15,
-              color: Colors.black87,
-              height: 1.6,
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(right: 24, top: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _bubble(10),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: _bubble(7),
-              ),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.only(right: 18),
-                child: _bubble(5),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _bubble(double r) => Container(
-    width: r * 2,
-    height: r * 2,
-    decoration: BoxDecoration(
-      color: Colors.white,
-      shape: BoxShape.circle,
-      border: Border.all(color: Colors.black87, width: 2),
-    ),
-  );
-}
-
-// ── Typewriter Text ───────────────────────────────────────────────────────────
-class _TypewriterText extends StatefulWidget {
-  final String text;
-  final TextStyle style;
-  const _TypewriterText({required this.text, required this.style});
-
-  @override
-  State<_TypewriterText> createState() => _TypewriterTextState();
-}
-
-class _TypewriterTextState extends State<_TypewriterText> {
-  String _displayed = '';
-  int _index = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _startTyping();
-  }
-
-  @override
-  void didUpdateWidget(_TypewriterText old) {
-    super.didUpdateWidget(old);
-    if (old.text != widget.text) {
-      _displayed = '';
-      _index = 0;
-      _startTyping();
-    }
-  }
-
-  void _startTyping() {
-    Future.doWhile(() async {
-      if (!mounted || _index >= widget.text.length) return false;
-      await Future.delayed(const Duration(milliseconds: 38));
-      if (!mounted) return false;
-      setState(() {
-        _displayed = widget.text.substring(0, ++_index);
-      });
-      return true;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(_displayed, textAlign: TextAlign.center, style: widget.style);
-  }
-}
-
-// ── Role Section ──────────────────────────────────────────────────────────────
-class _RoleSection extends StatefulWidget {
-  final bool isLeft;
-  final String characterImage;
+class _RotatedRoleSide extends StatelessWidget {
+  final int quarterTurns;
+  final String imagePath;
   final String initialText;
   final String explainText;
+  final String buttonText;
   final bool isReady;
   final VoidCallback onReady;
 
-  const _RoleSection({
-    required this.isLeft,
-    required this.characterImage,
+  const _RotatedRoleSide({
+    required this.quarterTurns,
+    required this.imagePath,
     required this.initialText,
     required this.explainText,
+    required this.buttonText,
     required this.isReady,
     required this.onReady,
   });
 
   @override
-  State<_RoleSection> createState() => _RoleSectionState();
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return RotatedBox(
+          quarterTurns: quarterTurns,
+          child: SizedBox(
+            width: constraints.maxHeight,
+            height: constraints.maxWidth,
+            child: _RoleSideContent(
+              imagePath: imagePath,
+              initialText: initialText,
+              explainText: explainText,
+              buttonText: buttonText,
+              isReady: isReady,
+              onReady: onReady,
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
-class _RoleSectionState extends State<_RoleSection>
+class _RoleSideContent extends StatefulWidget {
+  final String imagePath;
+  final String initialText;
+  final String explainText;
+  final String buttonText;
+  final bool isReady;
+  final VoidCallback onReady;
+
+  const _RoleSideContent({
+    required this.imagePath,
+    required this.initialText,
+    required this.explainText,
+    required this.buttonText,
+    required this.isReady,
+    required this.onReady,
+  });
+
+  @override
+  State<_RoleSideContent> createState() => _RoleSideContentState();
+}
+
+class _RoleSideContentState extends State<_RoleSideContent>
     with TickerProviderStateMixin {
   bool _showExplain = false;
-
-  // Glow
-  late AnimationController _glowController;
-  late Animation<double> _glowAnimation;
-
-  // Float
-  late AnimationController _floatController;
-  late Animation<double> _floatAnimation;
-
-  // Confetti
-  late AnimationController _confettiController;
-  final List<_ConfettiParticle> _particles = [];
-  final Random _rng = Random();
+  late final AnimationController _glowController;
+  late final Animation<double> _glowAnimation;
+  late final AnimationController _floatController;
+  late final Animation<double> _floatAnimation;
 
   @override
   void initState() {
     super.initState();
-
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _glowAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+    _glowAnimation = Tween<double>(begin: 0.35, end: 1.0).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
-
     _floatController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 2200),
     )..repeat(reverse: true);
-    _floatAnimation = Tween<double>(begin: -6, end: 6).animate(
+    _floatAnimation = Tween<double>(begin: -7, end: 7).animate(
       CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
     );
-
-    // Confetti ticker
-    _confettiController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 3),
-    );
-    _confettiController.addListener(() {
-      setState(() {
-        for (final p in _particles) {
-          p.update();
-        }
-        _particles.removeWhere((p) => p.y > 800);
-      });
-    });
-  }
-
-  void _triggerConfetti(Size size) {
-    // Spawn 60 particule
-    for (int i = 0; i < 60; i++) {
-      _particles.add(_ConfettiParticle(_rng, size.width, size.height));
-    }
-    _confettiController.repeat();
-    // Opreste dupa 3 secunde
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) _confettiController.stop();
-    });
-  }
-
-  @override
-  void didUpdateWidget(_RoleSection old) {
-    super.didUpdateWidget(old);
-    // Cand devine Ready, declanseaza confetti + vibratia
-    if (!old.isReady && widget.isReady) {
-      // Vibratie
-      HapticFeedback.heavyImpact();
-      // Confetti — nevoie de size, il luam in build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && context.size != null) {
-          _triggerConfetti(context.size!);
-        }
-      });
-    }
   }
 
   @override
   void dispose() {
     _glowController.dispose();
     _floatController.dispose();
-    _confettiController.dispose();
     super.dispose();
   }
 
@@ -370,233 +199,172 @@ class _RoleSectionState extends State<_RoleSection>
     final String currentText = _showExplain
         ? widget.explainText
         : widget.initialText;
-
-    // ── Buton START ──
-    final Widget startButton = GestureDetector(
-      onTap: widget.isReady ? null : widget.onReady,
-      child: AnimatedScale(
-        scale: widget.isReady ? 1.08 : 1.0,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutBack,
-        child: Container(
-          width: 58,
-          padding: const EdgeInsets.symmetric(vertical: 24),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: widget.isReady
-                ? const Color(0xff2e5e38)
-                : const Color(0xff3d7a4a),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: RotatedBox(
-            quarterTurns: widget.isLeft ? 1 : 3,
-            child: Text(
-              widget.isReady ? 'Ready!' : 'Start',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
+      child: Column(
+        children: [
+          Expanded(
+            flex: 4,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 350),
+              child: SpeechCloud(
+                key: ValueKey('${currentText}_${widget.isReady}'),
+                text: widget.isReady
+                    ? 'Ready!\nWaiting for the other player...'
+                    : currentText,
+                isReady: widget.isReady,
               ),
             ),
           ),
-        ),
-      ),
-    );
-
-    // ── Buton EXPLAIN MORE ──
-    final Widget explainButton = GestureDetector(
-      onTap: widget.isReady
-          ? null
-          : () => setState(() => _showExplain = !_showExplain),
-      child: Container(
-        width: 58,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: _showExplain
-              ? const Color(0xff4a7a54)
-              : const Color(0xff5a8f64),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: RotatedBox(
-          quarterTurns: widget.isLeft ? 1 : 3,
-          child: Text(
-            _showExplain ? '✕ Close' : '? Explain More',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+          const SizedBox(height: 10),
+          Expanded(
+            flex: 5,
+            child: Center(
+              child: _ReadyGlow(
+                isReady: widget.isReady,
+                animation: _glowAnimation,
+                child: AnimatedBuilder(
+                  animation: _floatAnimation,
+                  builder: (context, child) => Transform.translate(
+                    offset: Offset(0, _floatAnimation.value),
+                    child: child,
+                  ),
+                  child: widget.isReady
+                      ? AnimatedBuilder(
+                          animation: _glowAnimation,
+                          builder: (context, child) {
+                            // Pulsează între 1.0 și 1.12 cât timp e Ready
+                            final scale = 1.0 + (0.12 * _glowAnimation.value);
+                            return Transform.scale(scale: scale, child: child);
+                          },
+                          child: Image.asset(
+                            widget.imagePath,
+                            fit: BoxFit.contain,
+                          ),
+                        )
+                      : Image.asset(widget.imagePath, fit: BoxFit.contain),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
-
-    // ── Personaj cu float ──
-    Widget character = RotatedBox(
-      quarterTurns: widget.isLeft ? 1 : 3,
-      child: AnimatedBuilder(
-        animation: _floatAnimation,
-        builder: (context, child) => Transform.translate(
-          offset: Offset(0, _floatAnimation.value),
-          child: child,
-        ),
-        child: SizedBox(
-          width: 480,
-          child: Image.asset(widget.characterImage, fit: BoxFit.contain),
-        ),
-      ),
-    );
-
-    if (widget.isReady) {
-      character = AnimatedBuilder(
-        animation: _glowAnimation,
-        builder: (context, child) => Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(120),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.yellowAccent.withOpacity(
-                  0.7 * _glowAnimation.value,
-                ),
-                blurRadius: 60 * _glowAnimation.value,
-                spreadRadius: 0,
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _ExplainButton(
+                isActive: _showExplain,
+                onTap: widget.isReady
+                    ? () {}
+                    : () => setState(() => _showExplain = !_showExplain),
+              ),
+              const SizedBox(width: 12),
+              _ReadyButton(
+                text: widget.buttonText,
+                isReady: widget.isReady,
+                onTap: widget.isReady ? null : widget.onReady,
               ),
             ],
           ),
-          child: child,
-        ),
-        child: character,
-      );
-    }
-
-    return Stack(
-      children: [
-        // 1. Personaj
-        Positioned(
-          left: widget.isLeft ? 0 : null,
-          right: widget.isLeft ? null : 0,
-          top: widget.isLeft ? 0 : null,
-          bottom: widget.isLeft ? null : 0,
-          child: character,
-        ),
-
-        // 2. Cloud cu typewriter
-        Align(
-          alignment: widget.isLeft
-              ? const Alignment(0.3, 0.2)
-              : const Alignment(-0.3, -0.2),
-          child: RotatedBox(
-            quarterTurns: widget.isLeft ? 1 : 3,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.08),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
-              ),
-              // ← Typewriter în loc de Text simplu
-              child: _CloudWithTypewriter(
-                key: ValueKey(currentText),
-                text: currentText,
-              ),
-            ),
-          ),
-        ),
-
-        // 3. Confetti — deasupra tuturor
-        if (_particles.isNotEmpty)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: CustomPaint(painter: _ConfettiPainter(_particles)),
-            ),
-          ),
-
-        // 4. Butoane — ultimele = deasupra
-        Positioned(
-          left: widget.isLeft ? 8 : null,
-          right: widget.isLeft ? null : 8,
-          bottom: widget.isLeft ? 8 : null,
-          top: widget.isLeft ? null : 8,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: widget.isLeft
-                ? [explainButton, const SizedBox(height: 10), startButton]
-                : [startButton, const SizedBox(height: 10), explainButton],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-// ── Cloud cu typewriter înăuntru ──────────────────────────────────────────────
-class _CloudWithTypewriter extends StatelessWidget {
+// ── Speech Cloud (fără titlu) ──────────────────────────────────────────────
+class SpeechCloud extends StatelessWidget {
   final String text;
-  const _CloudWithTypewriter({super.key, required this.text});
+  final bool isReady;
+
+  const SpeechCloud({super.key, required this.text, required this.isReady});
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Container(
-          width: 500,
-          padding: const EdgeInsets.symmetric(horizontal: 44, vertical: 36),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(60),
-            border: Border.all(color: Colors.black87, width: 3),
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+            decoration: BoxDecoration(
+              color: isReady
+                  ? const Color(0xFFE8F5D0).withOpacity(0.96)
+                  : Colors.white.withOpacity(0.96),
+              borderRadius: BorderRadius.circular(55),
+              border: Border.all(
+                color: isReady
+                    ? const Color(0xFF5F985F)
+                    : const Color(0xFF111111),
+                width: isReady ? 2.4 : 2,
+              ),
+            ),
+            // ✅ Fără titlu — direct conținutul
+            child: Center(
+              child: isReady
+                  ? Text(
+                      text,
+                      textAlign: TextAlign.center,
+                      maxLines: 5,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.caveat(
+                        fontSize: 30,
+                        height: 1.15,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF111111),
+                      ),
+                    )
+                  : _TypewriterHighlight(text: text),
+            ),
           ),
-          child: _TypewriterHighlight(text: text),
         ),
-        Padding(
-          padding: const EdgeInsets.only(right: 24, top: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _dot(10),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: _dot(7),
-              ),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.only(right: 18),
-                child: _dot(5),
-              ),
-            ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 38, top: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _bubble(3.8, isReady),
+                const SizedBox(height: 3),
+                Padding(
+                  padding: const EdgeInsets.only(left: 9),
+                  child: _bubble(5.5, isReady),
+                ),
+                const SizedBox(height: 3),
+                Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: _bubble(8, isReady),
+                ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _dot(double r) => Container(
-    width: r * 2,
-    height: r * 2,
-    decoration: BoxDecoration(
-      color: Colors.white,
-      shape: BoxShape.circle,
-      border: Border.all(color: Colors.black87, width: 2),
-    ),
-  );
+  static Widget _bubble(double radius, bool isReady) {
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        color: isReady
+            ? const Color(0xFFE8F5D0).withOpacity(0.96)
+            : Colors.white.withOpacity(0.96),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isReady ? const Color(0xFF5F985F) : const Color(0xFF111111),
+          width: 1.8,
+        ),
+      ),
+    );
+  }
 }
 
-// ── Typewriter + Highlight combinat ──────────────────────────────────────────
+// ── Typewriter cu highlight — text mai gros ──────────────────────────────────
 class _TypewriterHighlight extends StatefulWidget {
   final String text;
   const _TypewriterHighlight({required this.text});
-
   @override
   State<_TypewriterHighlight> createState() => _TypewriterHighlightState();
 }
@@ -623,7 +391,7 @@ class _TypewriterHighlightState extends State<_TypewriterHighlight> {
   void _startTyping() {
     Future.doWhile(() async {
       if (!mounted || _visibleChars >= widget.text.length) return false;
-      await Future.delayed(const Duration(milliseconds: 38));
+      await Future.delayed(const Duration(milliseconds: 18));
       if (!mounted) return false;
       setState(() => _visibleChars++);
       return true;
@@ -632,15 +400,12 @@ class _TypewriterHighlightState extends State<_TypewriterHighlight> {
 
   @override
   Widget build(BuildContext context) {
-    // Textul vizibil pana la _visibleChars
     final visible = widget.text.substring(0, _visibleChars);
     final spans = <InlineSpan>[];
     String remaining = visible;
-
     while (remaining.isNotEmpty) {
       int earliestIndex = remaining.length;
       String? foundKeyword;
-
       for (final kw in _highlights) {
         final idx = remaining.indexOf(kw);
         if (idx != -1 && idx < earliestIndex) {
@@ -648,17 +413,13 @@ class _TypewriterHighlightState extends State<_TypewriterHighlight> {
           foundKeyword = kw;
         }
       }
-
       if (foundKeyword == null) {
         spans.add(TextSpan(text: remaining));
         break;
       }
-
       if (earliestIndex > 0) {
         spans.add(TextSpan(text: remaining.substring(0, earliestIndex)));
       }
-
-      final kw = foundKeyword;
       spans.add(
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
@@ -670,32 +431,121 @@ class _TypewriterHighlightState extends State<_TypewriterHighlight> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              kw,
-              style: const TextStyle(
+              foundKeyword,
+              style: GoogleFonts.caveat(
                 color: Colors.white,
-                fontSize: 19,
-                fontWeight: FontWeight.w800,
-                height: 1.4,
+                fontSize: 30,
+                fontWeight: FontWeight.w900,
+                height: 1.2,
               ),
             ),
           ),
         ),
       );
-
-      remaining = remaining.substring(earliestIndex + kw.length);
+      remaining = remaining.substring(earliestIndex + foundKeyword.length);
     }
-
     return RichText(
       textAlign: TextAlign.center,
       text: TextSpan(
-        style: const TextStyle(
-          fontSize: 19,
-          fontWeight: FontWeight.w600,
-          color: Colors.black87,
-          height: 1.6,
+        // ✅ text mai gros (w900 în loc de w800) și mai mare (25 în loc de 22)
+        style: GoogleFonts.caveat(
+          fontSize: 30,
+          fontWeight: FontWeight.w900,
+          color: const Color(0xFF111111),
+          height: 1.2,
         ),
         children: spans,
       ),
     );
+  }
+}
+
+class _ExplainButton extends StatelessWidget {
+  final bool isActive;
+  final VoidCallback onTap;
+  const _ExplainButton({required this.isActive, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        width: 142,
+        height: 46,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF4A7C59) : const Color(0xFFB9D7BE),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: isActive ? const Color(0xFF2E5638) : const Color(0xFF8FB99A),
+            width: 1.4,
+          ),
+        ),
+        child: Text(
+          isActive ? 'Show Less' : '? Explain',
+          style: GoogleFonts.caveat(
+            color: isActive ? Colors.white : const Color(0xFF111111),
+            fontWeight: FontWeight.w900,
+            fontSize: 22,
+            height: 0.9,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReadyButton extends StatelessWidget {
+  final String text;
+  final bool isReady;
+  final VoidCallback? onTap;
+  const _ReadyButton({
+    required this.text,
+    required this.isReady,
+    required this.onTap,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        width: 142,
+        height: 46,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isReady ? const Color(0xFF3F6F4A) : const Color(0xFF529E68),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: isReady ? const Color(0xFF2E5638) : const Color(0xFF418455),
+            width: 1.4,
+          ),
+        ),
+        child: Text(
+          text,
+          style: GoogleFonts.caveat(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 25,
+            height: 0.9,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReadyGlow extends StatelessWidget {
+  final bool isReady;
+  final Animation<double> animation;
+  final Widget child;
+  const _ReadyGlow({
+    required this.isReady,
+    required this.animation,
+    required this.child,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return child;
   }
 }

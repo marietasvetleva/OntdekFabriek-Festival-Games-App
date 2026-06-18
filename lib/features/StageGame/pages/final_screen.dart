@@ -30,22 +30,10 @@ class _FinalScreenState extends State<FinalScreen> {
   bool _soundPlayed = false;
   bool _leftPlayAgainReady = false;
   bool _rightPlayAgainReady = false;
-  double _flashOpacity = 0;
 
   @override
   void initState() {
     super.initState();
-
-    _flashOpacity = 1;
-
-    Future.delayed(const Duration(milliseconds: 250), () {
-      if (!mounted) return;
-
-      setState(() {
-        _flashOpacity = 0;
-      });
-    });
-
     _playResultSound();
   }
 
@@ -59,27 +47,6 @@ class _FinalScreenState extends State<FinalScreen> {
     await Future.delayed(const Duration(milliseconds: 250));
 
     if (!mounted) return;
-
-    final reaction = widget.crowdReaction.toLowerCase();
-    final comment = widget.endComment.toLowerCase();
-
-    final isBadResult =
-        reaction.contains('boo') ||
-        comment.contains('failed') ||
-        comment.contains('overload') ||
-        widget.audienceScore < 50;
-
-    _flashOpacity = isBadResult ? 1 : 0;
-
-    if (isBadResult) {
-      Future.delayed(const Duration(milliseconds: 250), () {
-        if (!mounted) return;
-
-        setState(() {
-          _flashOpacity = 0;
-        });
-      });
-    }
   }
 
   void _setLeftPlayAgainReady() {
@@ -144,14 +111,6 @@ class _FinalScreenState extends State<FinalScreen> {
                   'assets/StageGameV2-image/frame.png',
                   fit: BoxFit.fill,
                 ),
-              ),
-            ),
-
-            AnimatedOpacity(
-              opacity: _flashOpacity,
-              duration: const Duration(milliseconds: 300),
-              child: IgnorePointer(
-                child: Container(color: Colors.red.withOpacity(0.12)),
               ),
             ),
 
