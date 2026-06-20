@@ -1421,20 +1421,27 @@ class _StageGamePageState extends State<StageGamePage>
                         child: Stack(
                           clipBehavior: Clip.none,
                           children: [
-                            Positioned.fill(
-                              child: RotatedBox(
-                                quarterTurns: 0,
-                                child: Image.asset(
-                                  '$_assetBase/Stage_top_view.png',
-                                  fit: BoxFit.contain,
-                                ),
+                            Positioned(
+                            left: -120, // move stage left
+                            top: 0,
+                            bottom: 0,
+                            width: 720,
+                            child: RotatedBox(
+                              quarterTurns: 0,
+                              child: Image.asset(
+                                '$_assetBase/right_panel/Stage_top_view copy.png',
+                                fit: BoxFit.contain,
                               ),
                             ),
+                          ),
                             _buildSelectedPowerOnStage(pulse),
                             _buildSelectedSoundOnStage(pulse),
                             _buildSelectedLightOnStage(pulse),
                             _buildSelectedEffectOnStage(pulse),
                             _buildCrowdFeedbackOnStage(pulse),
+                            _buildAnimatedCrowd(pulse),
+                            _buildCrowdEmojiReaction(pulse),
+                            _buildSelectedPowerOnStage(pulse),
                           ],
                         ),
                       ),
@@ -1482,6 +1489,46 @@ class _StageGamePageState extends State<StageGamePage>
       ),
     );
   }
+
+  Widget _buildAnimatedCrowd(double pulse) {
+  final frontBounce = math.sin(pulse * math.pi * 2) * 4;
+  final backBounce = math.sin((pulse + 0.25) * math.pi * 2) * 2;
+
+  return Stack(
+    children: [
+      // FRONT CROWD
+        Positioned(
+          left: 175,
+          top: 110 + frontBounce,
+          child: Transform.rotate(
+            angle: -1.57,
+            child: Image.asset(
+              '$_assetBase/right_panel/Festival_crowd_cheering_concert___202606200956-removebg-preview.png',
+              width: 500,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+
+      // BACK CROWD - behind front crowd, same size but lighter
+      Positioned(
+        left: 310,
+        top: 100 + backBounce,
+        child: Opacity(
+          opacity: 0.45,
+          child: Transform.rotate(
+            angle: -1.57,
+            child: Image.asset(
+              '$_assetBase/right_panel/Untitled - 20 June 2026 at 10.01.21.png',
+              width: 600,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
 
   double _lightOpacity() {
     if (_state.selectedLight == null) return 0.04;
@@ -2168,7 +2215,116 @@ class _StageGamePageState extends State<StageGamePage>
       ),
     );
   }
+String _frontCrowdEmojiAsset() {
+  final overloaded = _state.currentPowerCapacity > 0 &&
+      _state.totalPowerLoad > _state.currentPowerCapacity;
 
+  if (overloaded) {
+    return '$_assetBase/right_panel/Turn_image_into_handdrawn_202606201106-removebg-preview copy 2.png';
+  }
+
+  if (_state.selectedSound == SoundOption.cheap &&
+      _state.soundControlLevel == StageControlLevel.high) {
+    return '$_assetBase/right_panel/Turn_image_into_handdrawn_202606201106-removebg-preview copy 2.png';
+  }
+
+  if (_state.selectedLight == LightOption.halogen &&
+      _state.lightControlLevel == StageControlLevel.high) {
+    return '$_assetBase/right_panel/Turn_image_into_handdrawn_202606201106-removebg-preview.png';
+  }
+
+  if (_state.selectedSound == SoundOption.pro &&
+      _state.soundControlLevel == StageControlLevel.high) {
+    return '$_assetBase/right_panel/party.png';
+  }
+
+  if (_state.selectedSound == SoundOption.eco &&
+      _state.soundControlLevel == StageControlLevel.medium) {
+    return '$_assetBase/right_panel/heartheyes.png';
+  }
+
+  if (_state.selectedLight == LightOption.smart &&
+      _state.lightControlLevel == StageControlLevel.high) {
+    return '$_assetBase/right_panel/party.png';
+  }
+
+  return '$_assetBase/right_panel/smilie.png';
+}
+
+String _backCrowdEmojiAsset() {
+  if (_state.selectedSound == null && _state.selectedLight == null) {
+    return '$_assetBase/right_panel/smilie.png';
+  }
+
+  if (_state.currentPowerCapacity > 0 &&
+      _state.totalPowerLoad > _state.currentPowerCapacity) {
+    return '$_assetBase/right_panel/Turn_image_into_handdrawn_202606201106-removebg-preview copy 2.png';
+  }
+
+  if (_state.selectedSound == SoundOption.pro &&
+      _state.soundControlLevel == StageControlLevel.high) {
+    return '$_assetBase/right_panel/party.png';
+  }
+
+  if (_state.selectedLight == LightOption.smart &&
+      _state.lightControlLevel == StageControlLevel.high) {
+    return '$_assetBase/right_panel/heartheyes.png';
+  }
+
+  if (_state.selectedSound != null &&
+      _state.soundControlLevel == StageControlLevel.low) {
+    return '$_assetBase/right_panel/Turn_image_into_handdrawn_202606201106-removebg-preview copy.png';
+  }
+
+  if (_state.selectedLight != null &&
+      _state.lightControlLevel == StageControlLevel.low) {
+    return '$_assetBase/right_panel/Turn_image_into_handdrawn_202606201106-removebg-preview.png';
+  }
+
+  return '$_assetBase/right_panel/smilie.png';
+}
+
+Widget _buildCrowdEmojiReaction(double pulse) {
+  final float1 = math.sin(pulse * math.pi * 2) * 6;
+  final float2 = math.sin((pulse + 0.35) * math.pi * 2) * 5;
+
+  return Stack(
+    children: [
+      _floatingEmoji(
+        asset: _frontCrowdEmojiAsset(),
+        left: 550,
+        top: 40 + float1,
+        size: 40,
+      ),
+      _floatingEmoji(
+        asset: _backCrowdEmojiAsset(),
+        left: 550,
+        top: 450 + float2,
+        size: 40,
+      ),
+    ],
+  );
+}
+
+  Widget _floatingEmoji({
+    required String asset,
+    required double left,
+    required double top,
+    required double size,
+  }) {
+    return Positioned(
+      left: left,
+      top: top,
+      child: Transform.rotate(
+        angle: -1.57,
+        child: Image.asset(
+          asset,
+          width: size,
+          fit: BoxFit.contain,
+        ),
+      ),
+    );
+  }
   Widget _buildRunningScreen() {
     return LayoutBuilder(
       builder: (context, constraints) {

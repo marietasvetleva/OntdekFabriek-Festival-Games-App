@@ -67,6 +67,7 @@ flutter:
   uses-material-design: true
 
   assets:
+
     # General images
     - assets/Images/
 
@@ -98,12 +99,23 @@ flutter:
     - assets/StageGameV2-image/frame.png
     - assets/StageGameV2-image/Stage_top_view.png
 
+
+
     # Stage right panel images
     - assets/StageGameV2-image/right_panel/
     - assets/StageGameV2-image/effects/
     - assets/StageGameV2-image/
     - assets/StageGameV2-audio/
-
+    - assets/StageGameV2-image/right_panel/Festival_crowd_cheering_concert___202606200956-removebg-preview.png
+    - assets/StageGameV2-image/right_panel/Untitled - 20 June 2026 at 10.01.21.png
+    - assets/StageGameV2-image/right_panel/Stage_top_view copy.png
+    - assets/StageGameV2-image/right_panel/heartheyes.png
+    - assets/StageGameV2-image/right_panel/party.png
+    - assets/StageGameV2-image/right_panel/smilie.png
+    - assets/StageGameV2-image/right_panel/Turn_image_into_handdrawn_202606201106-removebg-preview copy 2.png
+    - assets/StageGameV2-image/right_panel/Turn_image_into_handdrawn_202606201106-removebg-preview copy.png
+    - assets/StageGameV2-image/right_panel/Turn_image_into_handdrawn_202606201106-removebg-preview.png
+    
     # festival cleaner images
     - assets/trashGame/
     - assets/trashGame/BackgroundFlow/
