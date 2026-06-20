@@ -24,7 +24,12 @@ import '../widgets/stage_right_panel.dart';
 import 'final_screen.dart';
 
 class StageGamePage extends StatefulWidget {
-  const StageGamePage({super.key});
+  final String festivalName;
+
+  const StageGamePage({
+    super.key,
+    required this.festivalName,
+  });
 
   @override
   State<StageGamePage> createState() => _StageGamePageState();
@@ -338,6 +343,7 @@ class _StageGamePageState extends State<StageGamePage>
       context,
       MaterialPageRoute(
         builder: (_) => FinalScreen(
+          festivalName: widget.festivalName,
           sustainabilityScore: 0,
           stabilityScore: 0,
           audienceScore: 0,
@@ -379,6 +385,7 @@ class _StageGamePageState extends State<StageGamePage>
       MaterialPageRoute(
         builder: (_) => FinalScreen(
           sustainabilityScore: _state.sustainabilityScore,
+          festivalName: widget.festivalName,
           stabilityScore: _state.stabilityScore,
           audienceScore: _state.audienceSatisfactionScore,
           crowdReaction: _state.endCrowdReaction,

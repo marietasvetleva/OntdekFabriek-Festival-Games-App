@@ -1,3 +1,4 @@
+import 'package:deontdekfabriek/QR.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -10,6 +11,7 @@ class FinalScreen extends StatefulWidget {
   final int audienceScore;
   final String crowdReaction;
   final String endComment;
+  final String festivalName;
 
   const FinalScreen({
     super.key,
@@ -18,6 +20,7 @@ class FinalScreen extends StatefulWidget {
     required this.audienceScore,
     required this.crowdReaction,
     required this.endComment,
+    required this.festivalName
   });
 
   @override
@@ -35,6 +38,18 @@ class _FinalScreenState extends State<FinalScreen> {
   void initState() {
     super.initState();
     _playResultSound();
+  }
+
+  void _goHome() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+      builder: (_) => QRScannerPage(
+        festivalName: widget.festivalName,
+      ),
+      ),
+      (route) => false,
+    );
   }
 
   Future<void> _playResultSound() async {
@@ -92,7 +107,11 @@ class _FinalScreenState extends State<FinalScreen> {
 
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const SplashScreen()),
+        MaterialPageRoute(
+          builder: (_) => SplashScreen(
+            festivalName: widget.festivalName,
+          ),
+        ),
         (route) => false,
       );
     });
@@ -175,6 +194,35 @@ class _FinalScreenState extends State<FinalScreen> {
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+            Center(
+              child: GestureDetector(
+               onTap: _goHome,
+                child: Container(
+                  width: 74,
+                  height: 74,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4A7C59),
+                    shape: BoxShape.circle,
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 12,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: const Color(0xFFF5F0E8),
+                      width: 4,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.home_rounded,
+                    color: Colors.white,
+                    size: 36,
+                  ),
                 ),
               ),
             ),

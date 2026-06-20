@@ -6,7 +6,12 @@ import 'stage_game_page.dart';
 
 // hi
 class RoleSelectionScreen extends StatefulWidget {
-  const RoleSelectionScreen({super.key});
+  final String festivalName;
+
+  const RoleSelectionScreen({
+    super.key,
+    required this.festivalName,
+  });
 
   @override
   State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
@@ -22,7 +27,9 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const StageGamePage()),
+        MaterialPageRoute(builder: (_) => StageGamePage(
+          festivalName: widget.festivalName,
+        ),),
       );
     });
   }

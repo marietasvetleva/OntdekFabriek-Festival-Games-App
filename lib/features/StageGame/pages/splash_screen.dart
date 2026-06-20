@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'role_selection_screen.dart';
+import 'package:deontdekfabriek/QR.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final String festivalName;
+
+  const SplashScreen({
+    super.key,
+    required this.festivalName,
+  });
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -25,6 +31,18 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
 
+  void _goBackToQR() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QRScannerPage(
+          festivalName: widget.festivalName,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +59,7 @@ class _SplashScreenState extends State<SplashScreen>
     _scaleAnim = Tween<double>(begin: 0.88, end: 1.0).animate(
       CurvedAnimation(parent: _introController, curve: Curves.easeOutCubic),
     );
+
 
     // 2. Titlu slide de sus in jos, cu delay dupa scena
     _titleController = AnimationController(
@@ -82,111 +101,106 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
+Widget build(BuildContext context) {
+  final size = MediaQuery.of(context).size;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F0E8),
-      body: SizedBox(
-        width: size.width,
-        height: size.height,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // ── Frame ──
-            Positioned(
-              top: -60,
-              left: -55,
-              right: -84,
-              bottom: -55,
-              child: IgnorePointer(
-                child: Image.asset(
-                  'assets/StageGameV2-image/frame.png',
-                  fit: BoxFit.fill,
+  return Scaffold(
+    backgroundColor: const Color(0xFFF5F0E8),
+    body: SizedBox(
+      width: size.width,
+      height: size.height,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            top: -60,
+            left: -55,
+            right: -84,
+            bottom: -55,
+            child: IgnorePointer(
+              child: Image.asset(
+                'assets/StageGameV2-image/frame.png',
+                fit: BoxFit.fill,
+              ),
+            ),
+          ),
+
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _introController,
+              builder: (context, child) => Opacity(
+                opacity: _fadeAnim.value,
+                child: Transform.scale(
+                  scale: _scaleAnim.value,
+                  child: child,
+                ),
+              ),
+              child: Image.asset(
+                'assets/StageGameV2-image/stage.png',
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+
+          Positioned(
+            top: size.height * 0.14,
+            left: 0,
+            right: 0,
+            child: AnimatedBuilder(
+              animation: _titleController,
+              builder: (context, child) => FadeTransition(
+                opacity: _titleFade,
+                child: SlideTransition(
+                  position: _titleSlide,
+                  child: child,
+                ),
+              ),
+              child: Text(
+                'Stage Setup Challenge',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.caveat(
+                  fontSize: 78,
+                  fontWeight: FontWeight.w900,
+                  color: const Color.fromARGB(255, 14, 14, 14),
                 ),
               ),
             ),
+          ),
 
-            // ── Scena cu fade + zoom ──
-            Positioned.fill(
+          Positioned(
+            bottom: size.height * 0.08,
+            left: 0,
+            right: 0,
+            child: Center(
               child: AnimatedBuilder(
-                animation: _introController,
-                builder: (context, child) => Opacity(
-                  opacity: _fadeAnim.value,
-                  child: Transform.scale(scale: _scaleAnim.value, child: child),
-                ),
-                child: Image.asset(
-                  'assets/StageGameV2-image/stage.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-
-            // ── Titlu slide in de sus ──
-            Positioned(
-              top: size.height * 0.14,
-              left: 0,
-              right: 0,
-              child: AnimatedBuilder(
-                animation: _titleController,
-                builder: (context, child) => FadeTransition(
-                  opacity: _titleFade,
-                  child: SlideTransition(position: _titleSlide, child: child),
-                ),
-                child: Text(
-                  'Stage Setup Challenge',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.caveat(
-                    fontSize: 78,
-                    fontWeight: FontWeight.w900,
-                    color: const Color.fromARGB(255, 14, 14, 14),
-                  ),
-                ),
-              ),
-            ),
-
-            // ── Buton Start pulsator ──
-            Positioned(
-              bottom: size.height * 0.08,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: AnimatedBuilder(
-                  animation: _pulseAnim,
-                  builder: (context, child) =>
-                      Transform.scale(scale: _pulseAnim.value, child: child),
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const RoleSelectionScreen(),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      width: 180,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4A7C59),
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF4A7C59).withOpacity(0.5),
-                            blurRadius: 16,
-                            spreadRadius: 2,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                animation: _pulseAnim,
+                builder: (context, child) =>
+                    Transform.scale(scale: _pulseAnim.value, child: child),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RoleSelectionScreen(
+                        festivalName: widget.festivalName,
                       ),
-                      child: const Center(
-                        child: Text(
-                          'Start',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      )
+                    );
+                  },
+                  child: Container(
+                    width: 180,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4A7C59),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Start',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
@@ -194,9 +208,39 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+
+          Positioned(
+            top: 50,
+            left: 30,
+            child: GestureDetector(
+              onTap: _goBackToQR,
+              child: Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4A7C59),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF4A7C59).withOpacity(0.4),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: Colors.white,
+                  size: 34,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }
+    }
