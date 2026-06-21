@@ -2,7 +2,7 @@ name: deontdekfabriek
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -19,7 +19,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.10.0 <4.0.0'
+  sdk: ">=3.10.0 <4.0.0"
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -64,10 +64,10 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 
 flutter:
-
   uses-material-design: true
 
   assets:
+
     # General images
     - assets/Images/
 
@@ -76,7 +76,7 @@ flutter:
     - assets/garden/grass_lines.png
     - assets/garden/flowers_small.png
     - assets/garden/butterfly_1.png
-    - assets/garden/bee.png    
+    - assets/garden/bee.png
 
     # Toilet game images
     - assets/ToiletImage/
@@ -99,12 +99,22 @@ flutter:
     - assets/StageGameV2-image/frame.png
     - assets/StageGameV2-image/Stage_top_view.png
 
+
+
     # Stage right panel images
     - assets/StageGameV2-image/right_panel/
     - assets/StageGameV2-image/effects/
     - assets/StageGameV2-image/
     - assets/StageGameV2-audio/
-
+    - assets/StageGameV2-image/right_panel/Festival_crowd_cheering_concert___202606200956-removebg-preview.png
+    - assets/StageGameV2-image/right_panel/Untitled - 20 June 2026 at 10.01.21.png
+    - assets/StageGameV2-image/right_panel/Stage_top_view copy.png
+    - assets/StageGameV2-image/right_panel/heartheyes.png
+    - assets/StageGameV2-image/right_panel/party.png
+    - assets/StageGameV2-image/right_panel/smilie.png
+    - assets/StageGameV2-image/right_panel/Turn_image_into_handdrawn_202606201106-removebg-preview copy 2.png
+    - assets/StageGameV2-image/right_panel/Turn_image_into_handdrawn_202606201106-removebg-preview copy.png
+    - assets/StageGameV2-image/right_panel/Turn_image_into_handdrawn_202606201106-removebg-preview.png
     
     # festival cleaner images
     - assets/trashGame/
@@ -137,4 +147,3 @@ flutter:
     - assets/audio/band/
     - assets/audio/dj/
     - assets/audio/pop/
-

@@ -16,6 +16,7 @@ import 'toiletC_logic.dart';
 import 'toiletC_models.dart';
 import 'toiletC_movement.dart';
 import 'toiletC_world_fx.dart';
+import 'package:deontdekfabriek/QR.dart';
 
 enum _GamePhase { intro, running, results }
 enum _DepositFxType { vacuum, reject }
@@ -689,7 +690,12 @@ class _FestivalSplitLobby extends StatelessWidget {
 }
 
 class ToiletCompetitivePage extends StatefulWidget {
-  const ToiletCompetitivePage({super.key});
+  final String festivalName;
+
+  const ToiletCompetitivePage({
+    super.key,
+    required this.festivalName,
+  });
 
   @override
   State<ToiletCompetitivePage> createState() => _ToiletCompetitivePageState();
@@ -898,9 +904,11 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     // Full width (same as intro) — rotated sides need half-screen width as
     // their layout height; a narrow card causes bottom overflow.
     return Scaffold(
-      backgroundColor: ToiletCompetitiveArenaLayout.edgeFillColor,
-      body: _FestivalSplitLobby(
-        child: Padding(
+  backgroundColor: ToiletCompetitiveArenaLayout.edgeFillColor,
+  body: _FestivalSplitLobby(
+    child: Stack(
+      children: [
+        Padding(
           padding: MediaQuery.viewPaddingOf(context),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -937,10 +945,54 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
             ],
           ),
         ),
-      ),
-    );
-  }
 
+        Center(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(40),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => QRScannerPage(
+                      festivalName: widget.festivalName,
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F4F1),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFF8AA06B),
+                    width: 2,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      blurRadius: 10,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.home_rounded,
+                  size: 34,
+                  color: Color(0xFF6F8454),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  ),
+);
+}
   Widget _resultPlayerSide({
     required Color color,
     required List<Color> bgGradient,
@@ -2264,64 +2316,112 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     }
 
     if (_phase == _GamePhase.intro) {
-      return Scaffold(
-        backgroundColor: ToiletCompetitiveArenaLayout.edgeFillColor,
-        body: _FestivalSplitLobby(
-          child: Padding(
+  return Scaffold(
+    backgroundColor: ToiletCompetitiveArenaLayout.edgeFillColor,
+    body: _FestivalSplitLobby(
+      child: Stack(
+        children: [
+          Padding(
             padding: viewPadding,
             child: Row(
-            children: [
-              Expanded(
-                child: _introPlayerSide(
-                  playerLabel: 'Player 1',
-                  binLabel: 'Organic',
-                  instruction:
-                      'Drag waste to your bin (Organic).\n'
-                      'Wrong bin or non-recyclable\n= festival pass lost!',
-                  color: const Color(0xFFAEDC9B),
-                  bgGradient: const [Color(0xFFE8F5E3), Color(0xFFC8E6C0)],
-                  isReady: _p1Ready,
-                  onReady: () {
-                    setState(() => _p1Ready = true);
-                    if (_p2Ready) _beginCountdown();
-                  },
-                  quarterTurns: 1,
-                  otherReady: _p2Ready,
-                  countdown: _countdown,
-                  statusText: _p2Ready
-                      ? 'Player 2 joined!'
-                      : 'Waiting for Player 2...',
+              children: [
+                Expanded(
+                  child: _introPlayerSide(
+                    playerLabel: 'Player 1',
+                    binLabel: 'Organic',
+                    instruction:
+                        'Drag waste to your bin (Organic).\n'
+                        'Wrong bin or non-recyclable\n= festival pass lost!',
+                    color: const Color(0xFFAEDC9B),
+                    bgGradient: const [
+                      Color(0xFFE8F5E3),
+                      Color(0xFFC8E6C0),
+                    ],
+                    isReady: _p1Ready,
+                    onReady: () {
+                      setState(() => _p1Ready = true);
+                      if (_p2Ready) _beginCountdown();
+                    },
+                    quarterTurns: 1,
+                    otherReady: _p2Ready,
+                    countdown: _countdown,
+                    statusText: _p2Ready
+                        ? 'Player 2 joined!'
+                        : 'Waiting for Player 2...',
+                  ),
                 ),
-              ),
-              Container(width: 2, color: const Color(0xFFB8C5B0)),
-              Expanded(
-                child: _introPlayerSide(
-                  playerLabel: 'Player 2',
-                  binLabel: 'Plastic',
-                  instruction:
-                      'Drag waste to your bin (Plastic).\n'
-                      'Wrong bin or non-recyclable\n= festival pass lost!',
-                  color: const Color(0xFFFFC16A),
-                  bgGradient: const [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
-                  isReady: _p2Ready,
-                  onReady: () {
-                    setState(() => _p2Ready = true);
-                    if (_p1Ready) _beginCountdown();
-                  },
-                  quarterTurns: 3,
-                  otherReady: _p1Ready,
-                  countdown: _countdown,
-                  statusText: _p1Ready
-                      ? 'Player 1 joined!'
-                      : 'Waiting for Player 1...',
+                Container(width: 2, color: const Color(0xFFB8C5B0)),
+                Expanded(
+                  child: _introPlayerSide(
+                    playerLabel: 'Player 2',
+                    binLabel: 'Plastic',
+                    instruction:
+                        'Drag waste to your bin (Plastic).\n'
+                        'Wrong bin or non-recyclable\n= festival pass lost!',
+                    color: const Color(0xFFFFC16A),
+                    bgGradient: const [
+                      Color(0xFFFFF3E0),
+                      Color(0xFFFFE0B2),
+                    ],
+                    isReady: _p2Ready,
+                    onReady: () {
+                      setState(() => _p2Ready = true);
+                      if (_p1Ready) _beginCountdown();
+                    },
+                    quarterTurns: 3,
+                    otherReady: _p1Ready,
+                    countdown: _countdown,
+                    statusText: _p1Ready
+                        ? 'Player 1 joined!'
+                        : 'Waiting for Player 1...',
+                  ),
                 ),
-              ),
-            ],
+              ],
             ),
           ),
-        ),
-      );
-    }
+
+          Positioned(
+            top: 12,
+            left: 12,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(28),
+                onTap: () {
+                  Navigator.of(context).pop();
+                },
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4F4F1),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFF8AA06B),
+                      width: 2,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x33000000),
+                        blurRadius: 8,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Color(0xFF6F8454),
+                    size: 32,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
     final hudTop = viewPadding.top + 8;
     final hudBottom = viewPadding.bottom + 8;
