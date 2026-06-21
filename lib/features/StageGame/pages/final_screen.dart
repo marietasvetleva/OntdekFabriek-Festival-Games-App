@@ -1,3 +1,4 @@
+import 'package:deontdekfabriek/QR.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -10,6 +11,7 @@ class FinalScreen extends StatefulWidget {
   final int audienceScore;
   final String crowdReaction;
   final String endComment;
+  final String festivalName;
 
   const FinalScreen({
     super.key,
@@ -18,6 +20,7 @@ class FinalScreen extends StatefulWidget {
     required this.audienceScore,
     required this.crowdReaction,
     required this.endComment,
+    required this.festivalName
   });
 
   @override
@@ -37,6 +40,18 @@ class _FinalScreenState extends State<FinalScreen> {
     _playResultSound();
   }
 
+  void _goHome() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+      builder: (_) => QRScannerPage(
+        festivalName: widget.festivalName,
+      ),
+      ),
+      (route) => false,
+    );
+  }
+
   Future<void> _playResultSound() async {
     await _audioService.init();
 
@@ -51,7 +66,8 @@ class _FinalScreenState extends State<FinalScreen> {
     final reaction = widget.crowdReaction.toLowerCase();
     final comment = widget.endComment.toLowerCase();
 
-    final isBadResult = reaction.contains('boo') ||
+    final isBadResult =
+        reaction.contains('boo') ||
         comment.contains('failed') ||
         comment.contains('overload') ||
         widget.audienceScore < 50;
@@ -92,7 +108,9 @@ class _FinalScreenState extends State<FinalScreen> {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
-          builder: (_) => const SplashScreen(),
+          builder: (_) => SplashScreen(
+            festivalName: widget.festivalName,
+          ),
         ),
         (route) => false,
       );
@@ -129,7 +147,6 @@ class _FinalScreenState extends State<FinalScreen> {
                 ),
               ),
             ),
-
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(18),
@@ -155,9 +172,7 @@ class _FinalScreenState extends State<FinalScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(width: 16),
-
                     Expanded(
                       child: Center(
                         child: RotatedBox(
@@ -179,6 +194,35 @@ class _FinalScreenState extends State<FinalScreen> {
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+            Center(
+              child: GestureDetector(
+               onTap: _goHome,
+                child: Container(
+                  width: 74,
+                  height: 74,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4A7C59),
+                    shape: BoxShape.circle,
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 12,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: const Color(0xFFF5F0E8),
+                      width: 4,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.home_rounded,
+                    color: Colors.white,
+                    size: 36,
+                  ),
                 ),
               ),
             ),
@@ -216,10 +260,7 @@ class _FinalResultPanel extends StatelessWidget {
         Expanded(
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              vertical: 16,
-              horizontal: 16,
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             decoration: BoxDecoration(
               color: const Color.fromRGBO(234, 234, 224, 0.9),
               borderRadius: BorderRadius.circular(20),
@@ -254,22 +295,14 @@ class _FinalResultPanel extends StatelessWidget {
                   value: sustainabilityScore,
                 ),
                 const SizedBox(height: 8),
-                _ScoreRow(
-                  label: 'Stability Score',
-                  value: stabilityScore,
-                ),
+                _ScoreRow(label: 'Stability Score', value: stabilityScore),
                 const SizedBox(height: 8),
-                _ScoreRow(
-                  label: 'Audience Satisfaction',
-                  value: audienceScore,
-                ),
+                _ScoreRow(label: 'Audience Satisfaction', value: audienceScore),
               ],
             ),
           ),
         ),
-
         const SizedBox(height: 12),
-
         GestureDetector(
           onTap: isPlayAgainReady ? null : onPlayAgainReady,
           child: AnimatedContainer(
@@ -310,19 +343,13 @@ class _ScoreRow extends StatelessWidget {
   final String label;
   final int value;
 
-  const _ScoreRow({
-    required this.label,
-    required this.value,
-  });
+  const _ScoreRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        vertical: 10,
-        horizontal: 16,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       decoration: BoxDecoration(
         color: const Color(0xFF9DC4A8),
         borderRadius: BorderRadius.circular(30),
@@ -342,13 +369,19 @@ class _ScoreRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          Text(
-            value.toString(),
-            style: GoogleFonts.caveat(
-              fontSize: 25,
-              fontWeight: FontWeight.w900,
-              color: Colors.black,
-            ),
+          TweenAnimationBuilder<int>(
+            tween: IntTween(begin: 0, end: value),
+            duration: const Duration(milliseconds: 1500),
+            builder: (context, score, child) {
+              return Text(
+                '$score',
+                style: GoogleFonts.caveat(
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                ),
+              );
+            },
           ),
         ],
       ),
