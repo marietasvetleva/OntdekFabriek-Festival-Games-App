@@ -6,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'toiletC_arena_art.dart';
 import 'toiletC_arena_layout.dart';
 import 'toiletC_arena_layout_editor.dart';
 import 'toiletC_arena_layout_tune.dart';
@@ -655,6 +656,7 @@ class _FestivalSplitLobby extends StatelessWidget {
 
     return Stack(
       fit: StackFit.expand,
+      clipBehavior: Clip.hardEdge,
       children: [
         const Positioned.fill(
           child: ColoredBox(color: ToiletCompetitiveArenaLayout.edgeFillColor),
@@ -666,8 +668,8 @@ class _FestivalSplitLobby extends StatelessWidget {
           height: arena.height,
           child: ClipRect(
             child: Image.asset(
-              ToiletCompetitiveArenaLayout.arenaAsset,
-              fit: viewport.imageFit,
+              viewport.artSpec.assetPath,
+              fit: BoxFit.fill,
               alignment: Alignment.center,
               width: arena.width,
               height: arena.height,
@@ -702,6 +704,9 @@ class ToiletCompetitivePage extends StatefulWidget {
 }
 
 class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
+  /// Flip to `true` to show the aspect-ratio badge + bucket layout editor FAB.
+  static const bool _showArenaDevHud = false;
+
   static const double _itemMinSize = 120;
   static const double _itemStartSize = 148;
   static const double _spawnPopDurationSec = 0.42;
@@ -736,17 +741,29 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   bool _p2Ready = false;
   int? _countdown;
   ArenaLayoutTune? _layoutTune;
+  ArenaArtVariant? _layoutTuneVariant;
+
+  ArenaLayoutTune _layoutTuneFor(ArenaViewport viewport) {
+    final variant = viewport.artSpec.variant;
+    if (_layoutTune == null || _layoutTuneVariant != variant) {
+      return ArenaLayoutTune.defaultsFor(viewport.artSpec);
+    }
+    return _layoutTune!;
+  }
+
+  void _setLayoutTune(ArenaLayoutTune tune, ArenaArtVariant variant) {
+    setState(() {
+      _layoutTune = tune;
+      _layoutTuneVariant = variant;
+    });
+  }
+
   bool _layoutEditorEnabled = false;
   bool _finishScheduled = false;
-
-  /// Hot-reload on web can leave this unset when State fields change.
-  ArenaLayoutTune get _effectiveLayoutTune =>
-      _layoutTune ??= ArenaLayoutTune.defaults();
 
   @override
   void initState() {
     super.initState();
-    _layoutTune = ArenaLayoutTune.defaults();
     _gameState = _logic.createInitialState();
   }
 
@@ -1193,6 +1210,17 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
   Rect _playArea(ArenaViewport viewport) =>
       ToiletCompetitiveArenaLayout.playArea(viewport);
 
+  /// Timer sits high on the arena art (signpost band), not over the dirt pit.
+  double _timerTop(
+    ArenaViewport viewport,
+    EdgeInsets viewPadding,
+    double timerDiameter,
+  ) {
+    final arena = viewport.arenaRect;
+    final onArt = arena.top + arena.height * 0.055;
+    return max(viewPadding.top + 52, onArt - timerDiameter * 0.15);
+  }
+
   Rect _playerBucketRect({
     required ArenaViewport viewport,
     required int player,
@@ -1200,15 +1228,19 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     return ToiletCompetitiveArenaLayout.playerBucketRect(
       viewport: viewport,
       player: player,
-      tune: _effectiveLayoutTune,
+      tune: _layoutTuneFor(viewport),
     );
   }
 
-  Rect _bucketCatchRect(Rect bucketRect, int player) {
+  Rect _bucketCatchRect(
+    Rect bucketRect,
+    int player,
+    ArenaViewport viewport,
+  ) {
     return ToiletCompetitiveArenaLayout.bucketCatchRect(
       bucketRect,
       player,
-      _effectiveLayoutTune,
+      _layoutTuneFor(viewport),
     );
   }
 
@@ -1603,8 +1635,8 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final viewport = ArenaViewport.fromScreen(size);
     final p1Bucket = _playerBucketRect(viewport: viewport, player: 1);
     final p2Bucket = _playerBucketRect(viewport: viewport, player: 2);
-    final p1CatchRect = _bucketCatchRect(p1Bucket, 1);
-    final p2CatchRect = _bucketCatchRect(p2Bucket, 2);
+    final p1CatchRect = _bucketCatchRect(p1Bucket, 1, viewport);
+    final p2CatchRect = _bucketCatchRect(p2Bucket, 2, viewport);
 
     for (final spawn in _gameState.activeItems.toList()) {
       final layout = _layouts[spawn.id];
@@ -2296,7 +2328,6 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
     final size = MediaQuery.sizeOf(context);
     final viewPadding = MediaQuery.viewPaddingOf(context);
     final viewport = ArenaViewport.fromScreen(size);
-    final playArea = _playArea(viewport);
     final p1Bucket = _playerBucketRect(viewport: viewport, player: 1);
     final p2Bucket = _playerBucketRect(viewport: viewport, player: 2);
     final p1 = _gameState.players[CompetitivePlayerId.p1]!;
@@ -2441,7 +2472,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           bucketAssetRight: _bucketAssetRight,
           binTintFor: _binTintFor,
           scoreBadge: _scoreBadge,
-          layoutTune: _effectiveLayoutTune,
+          layoutTune: _layoutTuneFor(viewport),
           worldTimeSec: _gameState.elapsedSec,
           p1BucketBump: _p1BucketBump,
           p2BucketBump: _p2BucketBump,
@@ -2455,7 +2486,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
             ),
           ),
         Positioned(
-          top: max(viewPadding.top + 12, playArea.top - timerDiameter - 12),
+          top: _timerTop(viewport, viewPadding, timerDiameter),
           left: 0,
           right: 0,
           child: Center(
@@ -2481,14 +2512,14 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
           child: _ticketHud(p2.lives, p2.binType, fallLeft: false),
         ),
         ..._ticketFallFxWidgets(size),
-        if (kDebugMode && _layoutEditorEnabled)
+        if (kDebugMode && _showArenaDevHud && _layoutEditorEnabled)
           ToiletCompetitiveLayoutEditor(
             viewport: viewport,
-            tune: _effectiveLayoutTune,
-            onTuneChanged: (t) => setState(() => _layoutTune = t),
+            tune: _layoutTuneFor(viewport),
+            onTuneChanged: (t) => _setLayoutTune(t, viewport.artSpec.variant),
             onClose: () => setState(() => _layoutEditorEnabled = false),
           ),
-        if (kDebugMode)
+        if (kDebugMode && _showArenaDevHud)
           Positioned(
             left: 8,
             bottom: hudBottom,
@@ -2503,19 +2534,33 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                     horizontal: 8,
                     vertical: 4,
                   ),
-                  child: Text(
-                    viewport.debugLabel,
-                    style: const TextStyle(
-                      color: Color(0xFFE8F0E4),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        viewport.debugLabel,
+                        style: const TextStyle(
+                          color: Color(0xFFE8F0E4),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        viewport.debugMetricsLine,
+                        style: const TextStyle(
+                          color: Color(0xFFB8C8B0),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
           ),
-        if (kDebugMode)
+        if (kDebugMode && _showArenaDevHud)
           Positioned(
             right: 16,
             bottom: hudBottom + 8,

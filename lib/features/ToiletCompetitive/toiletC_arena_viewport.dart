@@ -1,17 +1,18 @@
-import 'package:flutter/foundation.dart';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
-import 'toiletC_arena_layout.dart';
+import 'toiletC_arena_art.dart';
 
 /// How the festival arena is fitted on screen.
 enum ArenaDeviceClass {
-  /// Laptops, wide desktop browsers — width-fit (existing behaviour).
+  /// Wide screens — 16∶9 arena art.
   desktopWide,
 
-  /// iPad 10th gen, Air 11", mini — height-fill so mud fills the screen.
+  /// Tablets / 4∶3 — 4∶3 arena art.
   compactTablet,
 
-  /// iPad Pro 12.9"/13" — falls back to width-fit letterboxing.
+  /// Legacy — unused.
   largeTablet,
 }
 
@@ -20,6 +21,7 @@ class ArenaViewport {
   ArenaViewport({
     required this.screenSize,
     required this.deviceClass,
+    required this.artSpec,
     required this.arenaRect,
     required this.scale,
     required this.imageFit,
@@ -27,84 +29,64 @@ class ArenaViewport {
 
   final Size screenSize;
   final ArenaDeviceClass deviceClass;
+  final ArenaArtSpec artSpec;
   final Rect arenaRect;
   final double scale;
   final BoxFit imageFit;
 
   double get arenaWidth => arenaRect.width;
   double get arenaHeight => arenaRect.height;
-
-  /// Picks layout mode from screen shape and platform (no extra plugins).
-  static ArenaDeviceClass detectDeviceClass(Size screen) {
-    if (screen.width < screen.height) {
-      return ArenaDeviceClass.desktopWide;
-    }
-
-    final aspect = screen.width / screen.height;
-    final shortSide = screen.shortestSide;
-
-    // Pro 12.9"/13" (~1024 pt short side in landscape) — not targeted for cover.
-    if (!kIsWeb &&
-        defaultTargetPlatform == TargetPlatform.iOS &&
-        shortSide >= 950) {
-      return ArenaDeviceClass.largeTablet;
-    }
-
-    // iPad 10 / Air 11 / mini on device, or Chrome devtools iPad preset.
-    final iosCompact = !kIsWeb &&
-        defaultTargetPlatform == TargetPlatform.iOS &&
-        shortSide >= 744 &&
-        shortSide < 950;
-    final aspectCompact = aspect >= 1.35 && aspect <= 1.58;
-
-    if (iosCompact || aspectCompact) {
-      return ArenaDeviceClass.compactTablet;
-    }
-
-    return ArenaDeviceClass.desktopWide;
-  }
+  double get designWidth => artSpec.designWidth;
+  double get designHeight => artSpec.designHeight;
 
   factory ArenaViewport.fromScreen(
     Size screen, {
     ArenaDeviceClass? overrideClass,
   }) {
-    final deviceClass = overrideClass ?? detectDeviceClass(screen);
+    final artSpec = overrideClass != null
+        ? ArenaArtSpec.forDeviceClass(overrideClass)
+        : ArenaArtSpec.pickForScreen(screen);
+    final deviceClass = artSpec.variant == ArenaArtVariant.tablet43
+        ? ArenaDeviceClass.compactTablet
+        : ArenaDeviceClass.desktopWide;
 
-    switch (deviceClass) {
-      case ArenaDeviceClass.compactTablet:
-        final scale = screen.height / ToiletCompetitiveArenaLayout.designHeight;
-        final w = ToiletCompetitiveArenaLayout.designWidth * scale;
-        final left = (screen.width - w) / 2;
-        return ArenaViewport(
-          screenSize: screen,
-          deviceClass: deviceClass,
-          arenaRect: Rect.fromLTWH(left, 0, w, screen.height),
-          scale: scale,
-          imageFit: BoxFit.cover,
-        );
-      case ArenaDeviceClass.desktopWide:
-      case ArenaDeviceClass.largeTablet:
-        final scale = screen.width / ToiletCompetitiveArenaLayout.designWidth;
-        final h = ToiletCompetitiveArenaLayout.designHeight * scale;
-        final top = (screen.height - h) / 2;
-        return ArenaViewport(
-          screenSize: screen,
-          deviceClass: deviceClass,
-          arenaRect: Rect.fromLTWH(0, top, screen.width, h),
-          scale: scale,
-          imageFit: BoxFit.fitWidth,
-        );
-    }
+    // Always cover — image fills the screen, excess cropped, no letterbox bars.
+    final scale = math.max(
+      screen.width / artSpec.designWidth,
+      screen.height / artSpec.designHeight,
+    );
+    final w = artSpec.designWidth * scale;
+    final h = artSpec.designHeight * scale;
+    final left = (screen.width - w) / 2;
+    final top = (screen.height - h) / 2;
+
+    return ArenaViewport(
+      screenSize: screen,
+      deviceClass: deviceClass,
+      artSpec: artSpec,
+      arenaRect: Rect.fromLTWH(left, top, w, h),
+      scale: scale,
+      imageFit: BoxFit.cover,
+    );
   }
 
   String get debugLabel {
     switch (deviceClass) {
       case ArenaDeviceClass.compactTablet:
-        return 'iPad (compact)';
+        return 'Tablet';
       case ArenaDeviceClass.largeTablet:
-        return 'iPad Pro (letterbox)';
+        return 'iPad Pro';
       case ArenaDeviceClass.desktopWide:
         return 'Desktop';
     }
+  }
+
+  String get debugMetricsLine {
+    final w = screenSize.width;
+    final h = screenSize.height;
+    final aspect = w / h;
+    final short = screenSize.shortestSide;
+    return '${w.toInt()}×${h.toInt()} · short ${short.toInt()} · '
+        'aspect ${aspect.toStringAsFixed(2)} · cover · ${artSpec.debugLabel}';
   }
 }

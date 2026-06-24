@@ -1,4 +1,6 @@
-/// Runtime-tunable arena layout (design space 1024×571). Values scale with viewport.
+import 'toiletC_arena_art.dart';
+
+/// Runtime-tunable arena layout (normalized 0–1 on active arena art). Values scale with viewport.
 class ArenaLayoutTune {
   ArenaLayoutTune({
     required this.leftBinCenterX,
@@ -22,18 +24,36 @@ class ArenaLayoutTune {
   double rightBucketAnchorX;
   double bucketAnchorY;
 
-  factory ArenaLayoutTune.defaults() {
-    return ArenaLayoutTune(
-      leftBinCenterX: 0.138,
-      leftBinCenterY: 0.549,
-      rightBinCenterX: 0.867,
-      rightBinCenterY: 0.549,
-      binPitDiameter: 0.141,
-      bucketFillInPit: 0.707,
-      leftBucketAnchorX: 0.520,
-      rightBucketAnchorX: 0.504,
-      bucketAnchorY: 0.850,
-    );
+  factory ArenaLayoutTune.defaults() =>
+      ArenaLayoutTune.defaultsFor(ArenaArtSpec.widescreen);
+
+  factory ArenaLayoutTune.defaultsFor(ArenaArtSpec spec) {
+    switch (spec.variant) {
+      case ArenaArtVariant.tablet43:
+        return ArenaLayoutTune(
+          leftBinCenterX: 0.134,
+          leftBinCenterY: 0.542,
+          rightBinCenterX: 0.866,
+          rightBinCenterY: 0.542,
+          binPitDiameter: 0.170,
+          bucketFillInPit: 1.000,
+          leftBucketAnchorX: 0.520,
+          rightBucketAnchorX: 0.480,
+          bucketAnchorY: 0.850,
+        );
+      case ArenaArtVariant.widescreen:
+        return ArenaLayoutTune(
+          leftBinCenterX: 0.138,
+          leftBinCenterY: 0.549,
+          rightBinCenterX: 0.862,
+          rightBinCenterY: 0.549,
+          binPitDiameter: 0.215,
+          bucketFillInPit: 0.902,
+          leftBucketAnchorX: 0.520,
+          rightBucketAnchorX: 0.480,
+          bucketAnchorY: 0.850,
+        );
+    }
   }
 
   ArenaLayoutTune copyWith({

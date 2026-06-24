@@ -132,8 +132,8 @@ class ToiletCompetitiveArenaScene extends StatelessWidget {
               children: [
                 Positioned.fill(
                   child: Image.asset(
-                    ToiletCompetitiveArenaLayout.arenaAsset,
-                    fit: viewport.imageFit,
+                    viewport.artSpec.assetPath,
+                    fit: BoxFit.fill,
                     alignment: Alignment.center,
                     filterQuality: FilterQuality.medium,
                     errorBuilder: (_, __, ___) => Container(

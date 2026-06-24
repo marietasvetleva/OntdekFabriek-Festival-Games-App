@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'toiletC_arena_art.dart';
 import 'toiletC_arena_layout.dart';
 import 'toiletC_arena_layout_tune.dart';
 import 'toiletC_arena_viewport.dart';
@@ -67,7 +68,7 @@ class _ToiletCompetitiveLayoutEditorState
   @override
   Widget build(BuildContext context) {
     final viewport = widget.viewport;
-    final tune = _tune;
+    final tune = widget.tune;
     final p1Pit = ToiletCompetitiveArenaLayout.binPitRect(viewport, 1, tune);
     final p2Pit = ToiletCompetitiveArenaLayout.binPitRect(viewport, 2, tune);
 
@@ -160,6 +161,8 @@ class _ToiletCompetitiveLayoutEditorState
   }
 
   Widget _panel(ArenaLayoutTune tune) {
+    final artLabel =
+        '${widget.viewport.artSpec.designWidth.toInt()}×${widget.viewport.artSpec.designHeight.toInt()}';
     Widget sliderRow({
       required String label,
       required double value,
@@ -227,17 +230,18 @@ class _ToiletCompetitiveLayoutEditorState
                 ),
               ],
             ),
-            const Text(
+            Text(
               'Drag green/orange handles onto the dirt pits. '
-              'Values are normalized to the arena art (1024×571) and scale when you resize the window.',
-              style: TextStyle(fontSize: 11, height: 1.35),
+              'Positions are normalized to arena art ($artLabel). '
+              'Pit size is % of screen short side.',
+              style: const TextStyle(fontSize: 11, height: 1.35),
             ),
             const SizedBox(height: 8),
             sliderRow(
               label: 'Pit diameter',
               value: tune.binPitDiameter,
-              min: 0.06,
-              max: 0.18,
+              min: 0.10,
+              max: 0.32,
               onChanged: (v) => _setTune(tune.copyWith(binPitDiameter: v)),
             ),
             sliderRow(
@@ -284,7 +288,9 @@ class _ToiletCompetitiveLayoutEditorState
                 ),
                 const SizedBox(width: 8),
                 TextButton(
-                  onPressed: () => _setTune(ArenaLayoutTune.defaults()),
+                  onPressed: () => _setTune(
+                    ArenaLayoutTune.defaultsFor(widget.viewport.artSpec),
+                  ),
                   child: const Text('Reset'),
                 ),
               ],
