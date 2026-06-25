@@ -3,11 +3,11 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'HangOutGame.dart';
 import 'FoodGame.dart';
-import 'FestivalCleanerApp.dart';
 import 'scores_page.dart';
 
 import 'features/ToiletCompetitive/toiletC_page.dart';
 import 'features/StageGame/pages/splash_screen.dart';
+import 'features/toilet/toilet_page.dart';
 
 import 'services/led_service.dart';
 
@@ -123,9 +123,7 @@ class _QRScannerPageState extends State<QRScannerPage>
     }
 
     if (v.contains('toilet') || v.contains('wc')) {
-      await _navigate(
-        const ToiletCompetitivePage(),
-      );
+      await _navigate(const ToiletGamePage());
       return;
     }
 
@@ -134,10 +132,13 @@ class _QRScannerPageState extends State<QRScannerPage>
       return;
     }
 
+    // Trash / waste sorting — competitive game (same QR stickers as before).
     if (v.contains('waste') ||
+        v.contains('trash') ||
+        v.contains('afval') ||
         v.contains('cleaner') ||
         v.contains('schoon')) {
-      await _navigate(const FestivalCleanerApp());
+      await _navigate(const ToiletCompetitivePage());
       return;
     }
 
