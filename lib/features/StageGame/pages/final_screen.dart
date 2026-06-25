@@ -11,7 +11,6 @@ class FinalScreen extends StatefulWidget {
   final int audienceScore;
   final String crowdReaction;
   final String endComment;
-  final String festivalName;
 
   const FinalScreen({
     super.key,
@@ -20,7 +19,6 @@ class FinalScreen extends StatefulWidget {
     required this.audienceScore,
     required this.crowdReaction,
     required this.endComment,
-    required this.festivalName
   });
 
   @override
@@ -44,9 +42,7 @@ class _FinalScreenState extends State<FinalScreen> {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-      builder: (_) => QRScannerPage(
-        festivalName: widget.festivalName,
-      ),
+      builder: (_) => const QRScannerPage(),
       ),
       (route) => false,
     );
@@ -108,9 +104,7 @@ class _FinalScreenState extends State<FinalScreen> {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
-          builder: (_) => SplashScreen(
-            festivalName: widget.festivalName,
-          ),
+          builder: (_) => const SplashScreen(),
         ),
         (route) => false,
       );

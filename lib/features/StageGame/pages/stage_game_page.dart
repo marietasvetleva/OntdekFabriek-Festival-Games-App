@@ -24,12 +24,7 @@ import '../widgets/stage_right_panel.dart';
 import 'final_screen.dart';
 
 class StageGamePage extends StatefulWidget {
-  final String festivalName;
-
-  const StageGamePage({
-    super.key,
-    required this.festivalName,
-  });
+  const StageGamePage({super.key});
 
   @override
   State<StageGamePage> createState() => _StageGamePageState();
@@ -343,7 +338,6 @@ class _StageGamePageState extends State<StageGamePage>
       context,
       MaterialPageRoute(
         builder: (_) => FinalScreen(
-          festivalName: widget.festivalName,
           sustainabilityScore: 0,
           stabilityScore: 0,
           audienceScore: 0,
@@ -385,7 +379,6 @@ class _StageGamePageState extends State<StageGamePage>
       MaterialPageRoute(
         builder: (_) => FinalScreen(
           sustainabilityScore: _state.sustainabilityScore,
-          festivalName: widget.festivalName,
           stabilityScore: _state.stabilityScore,
           audienceScore: _state.audienceSatisfactionScore,
           crowdReaction: _state.endCrowdReaction,
@@ -1438,9 +1431,39 @@ class _StageGamePageState extends State<StageGamePage>
                             _buildSelectedSoundOnStage(pulse),
                             _buildSelectedLightOnStage(pulse),
                             _buildSelectedEffectOnStage(pulse),
-                            _buildCrowdFeedbackOnStage(pulse),
                             _buildAnimatedCrowd(pulse),
-                            _buildCrowdEmojiReaction(pulse),
+                            _buildCrowdFeedbackOnStage(pulse),
+                            _floatingEmojiReaction(
+                              asset: _frontCrowdEmojiAsset(),
+                              left: 530,
+                              startTop: 110,
+                              progress: pulse,
+                              size: 42,
+                            ),
+
+                            _floatingEmojiReaction(
+                              asset: _frontCrowdEmojiAsset(),
+                              left: 570,
+                              startTop: 250,
+                              progress: (pulse + 0.22) % 1.0,
+                              size: 38,
+                            ),
+
+                            _floatingEmojiReaction(
+                              asset: _backCrowdEmojiAsset(),
+                              left: 610,
+                              startTop: 400,
+                              progress: (pulse + 0.47) % 1.0,
+                              size: 36,
+                            ),
+
+                            _floatingEmojiReaction(
+                              asset: _frontCrowdEmojiAsset(),
+                              left: 550,
+                              startTop: 500,
+                              progress: (pulse + 0.71) % 1.0,
+                              size: 40,
+                            ),
                             _buildSelectedPowerOnStage(pulse),
                           ],
                         ),
@@ -1580,8 +1603,8 @@ class _StageGamePageState extends State<StageGamePage>
     if (asset == null) return const SizedBox.shrink();
 
     return Positioned(
-      left: 230,
-      top: 390,
+      left: 80,
+      top: 420,
       child: Transform.rotate(
         angle: -1.57,
         child: _stageAssetImage(
@@ -1608,20 +1631,20 @@ class _StageGamePageState extends State<StageGamePage>
 
     // CHANGED:
     // Speakers are about 25% smaller and placed more inline on the stage.
-    final size = _state.selectedSound == SoundOption.pro ? 108.0 : 101.0;
+    final size = _state.selectedSound == SoundOption.pro ? 180.0 : 173.0;
 
     return Stack(
       children: [
         Positioned(
-          left: 315 + shake,
-          top: 175 + math.sin(pulse * math.pi * 2) * 2,
+          left: 150 + shake,
+          top: 30 + math.sin(pulse * math.pi * 2) * 2,
           child: Transform.rotate(
             angle: rotate - 1.57,
             child: _stageAssetImage(asset: asset, size: size, pulse: pulse),
           ),
         ),
         Positioned(
-          left: 270 - shake,
+          left: 150 - shake,
           top: 315 + math.sin((pulse + 0.3) * math.pi * 2) * 2,
           child: Transform.rotate(
             angle: rotate - 1.57,
@@ -1653,27 +1676,27 @@ class _StageGamePageState extends State<StageGamePage>
     return Stack(
       children: [
         Positioned(
-          left: 250 + xOffset,
-          top: 45 + yOffset,
+          left: 200 + xOffset,
+          top: 350 + yOffset,
           child: Transform.rotate(
             angle: -1.57,
-            child: _lightRigAsset(asset, color, glow, size: 70),
+            child: _lightRigAsset(asset, color, glow, size: 100),
           ),
         ),
         Positioned(
-          left: 292 + xOffset,
-          top: 130 + yOffset,
+          left: 150 + xOffset,
+          top: 200 + yOffset,
           child: Transform.rotate(
             angle: -1.57,
-            child: _lightRigAsset(asset, color, glow * 0.8, size: 60),
+            child: _lightRigAsset(asset, color, glow * 0.8, size: 100),
           ),
         ),
         Positioned(
-          left: 225 + xOffset,
-          top: 222 + yOffset,
+          left: 200 + xOffset,
+          top: 60 + yOffset,
           child: Transform.rotate(
             angle: -1.57,
-            child: _lightRigAsset(asset, color, glow * 0.8, size: 60),
+            child: _lightRigAsset(asset, color, glow * 0.8, size: 100),
           ),
         ),
       ],
@@ -1725,33 +1748,19 @@ class _StageGamePageState extends State<StageGamePage>
       return Stack(
         children: [
           _laserImage(
-            left: 190,
-            top: 58,
+            left: 90,
+            top: 350,
             angle: 0.82 - 1.57,
             width: 230,
             pulse: pulse,
           ),
           _laserImage(
-            left: 270,
-            top: 48,
-            angle: 0.48 - 1.57,
+            left: 90,
+            top: 120,
+            angle: 0.82 - 1.57,
             width: 220,
             pulse: pulse,
-          ),
-          _laserImage(
-            left: 350,
-            top: 62,
-            angle: 0.18 - 1.57,
-            width: 210,
-            pulse: pulse,
-          ),
-          _laserImage(
-            left: 430,
-            top: 92,
-            angle: -0.10 - 1.57,
-            width: 190,
-            pulse: pulse,
-          ),
+          )
         ],
       );
     }
@@ -1764,7 +1773,7 @@ class _StageGamePageState extends State<StageGamePage>
         children: [
           _droneImage(
             asset,
-            left: 370,
+            left: 40,
             top: 85,
             size: 125,
             pulse: pulse,
@@ -1772,7 +1781,7 @@ class _StageGamePageState extends State<StageGamePage>
           ),
           _droneImage(
             asset,
-            left: 240,
+            left: 40,
             top: 360,
             size: 120,
             pulse: pulse,
@@ -1780,19 +1789,11 @@ class _StageGamePageState extends State<StageGamePage>
           ),
           _droneImage(
             asset,
-            left: 430,
+            left: 40,
             top: 190,
             size: 110,
             pulse: pulse,
             phase: 0.55,
-          ),
-          _droneImage(
-            asset,
-            left: 235,
-            top: 235,
-            size: 110,
-            pulse: pulse,
-            phase: 0.75,
           ),
         ],
       );
@@ -1808,39 +1809,31 @@ class _StageGamePageState extends State<StageGamePage>
         children: [
           _fireworkImage(
             asset,
-            left: 185,
-            top: 115,
-            size: 135,
+            left: 30,
+            top: 400,
+            size: 110,
             pulse: pulse,
             phase: 0,
           ),
           _fireworkImage(
             asset,
-            left: 255,
-            top: 72,
+            left: 30,
+            top: 250,
             size: 155,
             pulse: pulse,
-            phase: 0.2,
+            phase: 0,
           ),
           _fireworkImage(
             asset,
-            left: 340,
-            top: 58,
-            size: 165,
+            left: 30,
+            top: 122,
+            size: 130,
             pulse: pulse,
-            phase: 0.4,
+            phase: 0.8,
           ),
           _fireworkImage(
             asset,
-            left: 430,
-            top: 78,
-            size: 150,
-            pulse: pulse,
-            phase: 0.6,
-          ),
-          _fireworkImage(
-            asset,
-            left: 505,
+            left: 30,
             top: 122,
             size: 130,
             pulse: pulse,
@@ -1867,21 +1860,21 @@ class _StageGamePageState extends State<StageGamePage>
         if (messages.isNotEmpty)
           _crowdBubble(
             text: messages[0],
-            left: 500,
+            left: 350,
             top: 118 + math.sin(pulse * math.pi * 2) * 4,
             color: const Color(0xFFFDFCF7),
           ),
         if (messages.length > 1)
           _crowdBubble(
             text: messages[1],
-            left: 560,
+            left: 400,
             top: 230 + math.sin((pulse + 0.35) * math.pi * 2) * 4,
             color: const Color(0xFFFFF2C2),
           ),
         if (messages.length > 2)
           _crowdBubble(
             text: messages[2],
-            left: 505,
+            left: 340,
             top: 345 + math.sin((pulse + 0.7) * math.pi * 2) * 4,
             color: const Color(0xFFE6F1E8),
           ),
@@ -2151,27 +2144,6 @@ class _StageGamePageState extends State<StageGamePage>
             height: size,
             fit: BoxFit.contain,
           ),
-          if (label != null)
-            Container(
-              margin: const EdgeInsets.only(top: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFDFCF7).withOpacity(0.9),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFD8D0C2),
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                label,
-                style: GoogleFonts.caveat(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF2F2F35),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -2284,25 +2256,38 @@ String _backCrowdEmojiAsset() {
   return '$_assetBase/right_panel/smilie.png';
 }
 
-Widget _buildCrowdEmojiReaction(double pulse) {
-  final float1 = math.sin(pulse * math.pi * 2) * 6;
-  final float2 = math.sin((pulse + 0.35) * math.pi * 2) * 5;
+Widget _floatingEmojiReaction({
+  required String asset,
+  required double left,
+  required double startTop,
+  required double progress,
+  required double size,
+}) {
+  final curved = Curves.easeOut.transform(progress);
+  final opacity = (1.0 - progress).clamp(0.0, 1.0);
+  final yMove = curved * 75;
+  final xDrift = math.sin(progress * math.pi * 2) * 10;
+  final scale = 0.75 + (progress * 0.35);
 
-  return Stack(
-    children: [
-      _floatingEmoji(
-        asset: _frontCrowdEmojiAsset(),
-        left: 550,
-        top: 40 + float1,
-        size: 40,
+  return Positioned(
+    left: left + xDrift,
+    top: startTop - yMove,
+    child: IgnorePointer(
+      child: Opacity(
+        opacity: opacity,
+        child: Transform.rotate(
+          angle: -1.57,
+          child: Transform.scale(
+            scale: scale,
+            child: Image.asset(
+              asset,
+              width: size,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
       ),
-      _floatingEmoji(
-        asset: _backCrowdEmojiAsset(),
-        left: 550,
-        top: 450 + float2,
-        size: 40,
-      ),
-    ],
+    ),
   );
 }
 

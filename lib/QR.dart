@@ -12,12 +12,7 @@ import 'features/StageGame/pages/splash_screen.dart';
 import 'services/led_service.dart';
 
 class QRScannerPage extends StatefulWidget {
-  final String festivalName;
-
-  const QRScannerPage({
-    super.key,
-    required this.festivalName,
-  });
+  const QRScannerPage({super.key});
 
   @override
   State<QRScannerPage> createState() => _QRScannerPageState();
@@ -122,18 +117,14 @@ class _QRScannerPageState extends State<QRScannerPage>
 
     if (v.contains('stage') || v.contains('podium')) {
       await _navigate(
-        SplashScreen(
-          festivalName: widget.festivalName,
-        ),
+        const SplashScreen(),
       );
       return;
     }
 
     if (v.contains('toilet') || v.contains('wc')) {
       await _navigate(
-        ToiletCompetitivePage(
-          festivalName: widget.festivalName,
-        ),
+        const ToiletCompetitivePage(),
       );
       return;
     }
@@ -176,7 +167,7 @@ class _QRScannerPageState extends State<QRScannerPage>
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 139, 210, 142),
       appBar: AppBar(
-        title: Text('${widget.festivalName} - Scan QR Codes'),
+        title: const Text('Scan QR Codes'),
         backgroundColor: const Color(0xFF2E7D32),
         actions: [
           IconButton(
@@ -246,24 +237,22 @@ class _QRScannerPageState extends State<QRScannerPage>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: () => _navigate(
-                      ToiletCompetitivePage(
-                        festivalName: widget.festivalName,
-                      ),
-                    ),
-                    child: const Text('Test Toilet Competitive'),
-                  ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: () => _navigate(
-                      SplashScreen(
-                        festivalName: widget.festivalName,
-                      ),
-                    ),
-                    child: const Text('Test Stage Game'),
-                  ),
+                  // const SizedBox(height: 10),
+                  // ElevatedButton(
+                  //   onPressed: () => _navigate(
+                  //     const ToiletCompetitivePage(),
+                  //   ),
+                  //   child: const Text('Test Toilet Competitive'),
+                  // ),
+
+                  // const SizedBox(height: 10),
+
+                  // ElevatedButton(
+                  //   onPressed: () => _navigate(
+                  //     const SplashScreen(),
+                  //   ),
+                  //   child: const Text('Test Stage Game'),
+                  // ),
                 ],
               ),
             ),

@@ -692,12 +692,7 @@ class _FestivalSplitLobby extends StatelessWidget {
 }
 
 class ToiletCompetitivePage extends StatefulWidget {
-  final String festivalName;
-
-  const ToiletCompetitivePage({
-    super.key,
-    required this.festivalName,
-  });
+  const ToiletCompetitivePage({super.key});
 
   @override
   State<ToiletCompetitivePage> createState() => _ToiletCompetitivePageState();
@@ -972,9 +967,7 @@ class _ToiletCompetitivePageState extends State<ToiletCompetitivePage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => QRScannerPage(
-                      festivalName: widget.festivalName,
-                    ),
+                    builder: (_) => const QRScannerPage(),
                   ),
                 );
               },
