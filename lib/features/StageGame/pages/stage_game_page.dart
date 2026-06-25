@@ -1431,9 +1431,39 @@ class _StageGamePageState extends State<StageGamePage>
                             _buildSelectedSoundOnStage(pulse),
                             _buildSelectedLightOnStage(pulse),
                             _buildSelectedEffectOnStage(pulse),
-                            _buildCrowdFeedbackOnStage(pulse),
                             _buildAnimatedCrowd(pulse),
-                            _buildCrowdEmojiReaction(pulse),
+                            _buildCrowdFeedbackOnStage(pulse),
+                            _floatingEmojiReaction(
+                              asset: _frontCrowdEmojiAsset(),
+                              left: 530,
+                              startTop: 110,
+                              progress: pulse,
+                              size: 42,
+                            ),
+
+                            _floatingEmojiReaction(
+                              asset: _frontCrowdEmojiAsset(),
+                              left: 570,
+                              startTop: 250,
+                              progress: (pulse + 0.22) % 1.0,
+                              size: 38,
+                            ),
+
+                            _floatingEmojiReaction(
+                              asset: _backCrowdEmojiAsset(),
+                              left: 610,
+                              startTop: 400,
+                              progress: (pulse + 0.47) % 1.0,
+                              size: 36,
+                            ),
+
+                            _floatingEmojiReaction(
+                              asset: _frontCrowdEmojiAsset(),
+                              left: 550,
+                              startTop: 500,
+                              progress: (pulse + 0.71) % 1.0,
+                              size: 40,
+                            ),
                             _buildSelectedPowerOnStage(pulse),
                           ],
                         ),
@@ -1830,21 +1860,21 @@ class _StageGamePageState extends State<StageGamePage>
         if (messages.isNotEmpty)
           _crowdBubble(
             text: messages[0],
-            left: 500,
+            left: 350,
             top: 118 + math.sin(pulse * math.pi * 2) * 4,
             color: const Color(0xFFFDFCF7),
           ),
         if (messages.length > 1)
           _crowdBubble(
             text: messages[1],
-            left: 560,
+            left: 400,
             top: 230 + math.sin((pulse + 0.35) * math.pi * 2) * 4,
             color: const Color(0xFFFFF2C2),
           ),
         if (messages.length > 2)
           _crowdBubble(
             text: messages[2],
-            left: 505,
+            left: 340,
             top: 345 + math.sin((pulse + 0.7) * math.pi * 2) * 4,
             color: const Color(0xFFE6F1E8),
           ),
@@ -2226,25 +2256,38 @@ String _backCrowdEmojiAsset() {
   return '$_assetBase/right_panel/smilie.png';
 }
 
-Widget _buildCrowdEmojiReaction(double pulse) {
-  final float1 = math.sin(pulse * math.pi * 2) * 6;
-  final float2 = math.sin((pulse + 0.35) * math.pi * 2) * 5;
+Widget _floatingEmojiReaction({
+  required String asset,
+  required double left,
+  required double startTop,
+  required double progress,
+  required double size,
+}) {
+  final curved = Curves.easeOut.transform(progress);
+  final opacity = (1.0 - progress).clamp(0.0, 1.0);
+  final yMove = curved * 75;
+  final xDrift = math.sin(progress * math.pi * 2) * 10;
+  final scale = 0.75 + (progress * 0.35);
 
-  return Stack(
-    children: [
-      _floatingEmoji(
-        asset: _frontCrowdEmojiAsset(),
-        left: 550,
-        top: 40 + float1,
-        size: 40,
+  return Positioned(
+    left: left + xDrift,
+    top: startTop - yMove,
+    child: IgnorePointer(
+      child: Opacity(
+        opacity: opacity,
+        child: Transform.rotate(
+          angle: -1.57,
+          child: Transform.scale(
+            scale: scale,
+            child: Image.asset(
+              asset,
+              width: size,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
       ),
-      _floatingEmoji(
-        asset: _backCrowdEmojiAsset(),
-        left: 550,
-        top: 450 + float2,
-        size: 40,
-      ),
-    ],
+    ),
   );
 }
 

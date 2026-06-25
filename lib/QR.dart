@@ -237,22 +237,22 @@ class _QRScannerPageState extends State<QRScannerPage>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: () => _navigate(
-                      const ToiletCompetitivePage(),
-                    ),
-                    child: const Text('Test Toilet Competitive'),
-                  ),
+                  // const SizedBox(height: 10),
+                  // ElevatedButton(
+                  //   onPressed: () => _navigate(
+                  //     const ToiletCompetitivePage(),
+                  //   ),
+                  //   child: const Text('Test Toilet Competitive'),
+                  // ),
 
-                  const SizedBox(height: 10),
+                  // const SizedBox(height: 10),
 
-                  ElevatedButton(
-                    onPressed: () => _navigate(
-                      const SplashScreen(),
-                    ),
-                    child: const Text('Test Stage Game'),
-                  ),
+                  // ElevatedButton(
+                  //   onPressed: () => _navigate(
+                  //     const SplashScreen(),
+                  //   ),
+                  //   child: const Text('Test Stage Game'),
+                  // ),
                 ],
               ),
             ),
