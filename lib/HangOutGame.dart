@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'dart:ui';
-import 'home_page.dart';
 import 'services/led_service.dart';
 
 // HANGOUT AREA MINI-GAME
@@ -131,12 +130,6 @@ class _HangoutQuizPageState extends State<HangoutQuizPage>
     super.dispose();
   }
 
-  void _goBackToMain() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const MyHomePage(festivalName: "")),
-      (route) => false,
-    );
-  }
 
   // ---------- sound helpers ----------
   Future<void> _playSfx(String fileName) async {
@@ -285,7 +278,7 @@ class _HangoutQuizPageState extends State<HangoutQuizPage>
                   debugPrint('❌ Error registering hangout score: $e');
                 }
 
-                _goBackToMain();
+              
               },
               child: const Text(
                 "Back to main page",

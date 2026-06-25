@@ -4,12 +4,7 @@ import 'role_selection_screen.dart';
 import 'package:deontdekfabriek/QR.dart';
 
 class SplashScreen extends StatefulWidget {
-  final String festivalName;
-
-  const SplashScreen({
-    super.key,
-    required this.festivalName,
-  });
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -32,16 +27,14 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _pulseAnim;
 
   void _goBackToQR() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => QRScannerPage(
-          festivalName: widget.festivalName,
-        ),
-      ),
-      (route) => false,
-    );
-  }
+  Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const QRScannerPage(),
+    ),
+    (route) => false,
+  );
+}
 
   @override
   void initState() {
@@ -181,9 +174,7 @@ Widget build(BuildContext context) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => RoleSelectionScreen(
-                        festivalName: widget.festivalName,
-                      ),
+                        builder: (_) => const RoleSelectionScreen()
                       )
                     );
                   },

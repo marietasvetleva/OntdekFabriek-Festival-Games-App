@@ -1,6 +1,7 @@
+import 'package:deontdekfabriek/QR.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-import 'Festival_name_page.dart';
+import 'package:deontdekfabriek/QR.dart'; 
 
 class IntroVideoPage extends StatefulWidget {
   const IntroVideoPage({super.key});
@@ -44,7 +45,7 @@ class _IntroVideoPageState extends State<IntroVideoPage> {
 
   void _goNext() {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const FestivalNamePage()),
+      MaterialPageRoute(builder: (_) => const QRScannerPage()),
     );
   }
 

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'services/led_service.dart';
-import 'result_page.dart';
 import 'result_page_bad.dart';
 
 class ScoresPage extends StatelessWidget {
@@ -326,17 +325,10 @@ class ScoresPage extends StatelessWidget {
         festivalName: 'Eco Festival',
         onMinigameCompleted: () {},
       );
-    } else {
-      // Good ending (14-25 points)
-      endingPage = ResultPage(
-        score: totalPoints,
-        bandName: 'Festival',
-        festivalName: 'Eco Festival',
-        onMinigameCompleted: () {},
-      );
+    }
     }
 
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => endingPage));
+    
   }
 
   String _getEcoMessage(int percentage) {
@@ -347,4 +339,4 @@ class ScoresPage extends StatelessWidget {
     if (percentage >= 20) return '🌍 Begin gemaakt! Speel meer games!';
     return '';
   }
-}
+
